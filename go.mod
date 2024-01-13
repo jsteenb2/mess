@@ -1,4 +1,4 @@
-module mess
+module github.com/jsteenb2/mess
 
 go 1.22
 
