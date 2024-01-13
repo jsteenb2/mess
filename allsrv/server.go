@@ -45,12 +45,12 @@ import (
 */
 
 type Server struct {
-	db *inmemDB // 1)
+	db *InmemDB // 1)
 	
 	user, pass string // 3)
 }
 
-func NewServer(db *inmemDB, user, pass string) *Server {
+func NewServer(db *InmemDB, user, pass string) *Server {
 	s := Server{
 		db:   db,
 		user: user,
@@ -161,11 +161,12 @@ func (s *Server) delFoo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type inmemDB struct {
+// InmemDB is an in-memory store.
+type InmemDB struct {
 	m []Foo // 12)
 }
 
-func (db *inmemDB) createFoo(f Foo) (string, error) {
+func (db *InmemDB) createFoo(f Foo) (string, error) {
 	f.ID = uuid.Must(uuid.NewV4()).String() // 11)
 	
 	for _, existing := range db.m {
@@ -179,7 +180,7 @@ func (db *inmemDB) createFoo(f Foo) (string, error) {
 	return f.ID, nil
 }
 
-func (db *inmemDB) readFoo(id string) (Foo, error) {
+func (db *InmemDB) readFoo(id string) (Foo, error) {
 	for _, f := range db.m {
 		if id == f.ID {
 			return f, nil
@@ -188,7 +189,7 @@ func (db *inmemDB) readFoo(id string) (Foo, error) {
 	return Foo{}, errors.New("foo not found for id: " + id) // 8)
 }
 
-func (db *inmemDB) updateFoo(f Foo) error {
+func (db *InmemDB) updateFoo(f Foo) error {
 	for i, existing := range db.m {
 		if f.ID == existing.ID {
 			db.m[i] = f
@@ -198,7 +199,7 @@ func (db *inmemDB) updateFoo(f Foo) error {
 	return errors.New("foo not found for id: " + f.ID) // 8)
 }
 
-func (db *inmemDB) delFoo(id string) error {
+func (db *InmemDB) delFoo(id string) error {
 	for i, f := range db.m {
 		if id == f.ID {
 			db.m = append(db.m[:i], db.m[i+1:]...)
