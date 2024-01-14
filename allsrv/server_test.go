@@ -99,6 +99,28 @@ func TestServer(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rec.Code)
 		})
 	})
+
+	t.Run("foo delete", func(t *testing.T) {
+		t.Run("when deleting an existing foo should pass", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+			err := db.CreateFoo(allsrv.Foo{
+				ID:   "id1",
+				Name: "first_name",
+				Note: "first note",
+			})
+			require.NoError(t, err)
+
+			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+
+			req := httptest.NewRequest("DELETE", "/foo?id=id1", nil)
+			req.SetBasicAuth("dodgers@stink.com", "PaSsWoRd")
+			rec := httptest.NewRecorder()
+
+			svr.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+		})
+	})
 }
 
 func newJSONBody(t *testing.T, v any) *bytes.Buffer {
