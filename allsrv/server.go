@@ -36,6 +36,7 @@ import (
 	10) Observability....
 	✅11) hard coding UUID generation into db
 	12) possible race conditions in inmem store
+	✅13) there is a bug in the delete foo inmem db implementation
 
 	Praises:
 	1) minimal public API
@@ -215,6 +216,7 @@ func (db *InmemDB) delFoo(id string) error {
 	for i, f := range db.m {
 		if id == f.ID {
 			db.m = append(db.m[:i], db.m[i+1:]...)
+			return nil // 13)
 		}
 	}
 	return errors.New("foo not found for id: " + id) // 8)
