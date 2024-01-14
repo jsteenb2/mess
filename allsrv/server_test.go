@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/hashicorp/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +18,7 @@ import (
 func TestServer(t *testing.T) {
 	t.Run("foo create", func(t *testing.T) {
 		t.Run("when provided a valid foo should pass", func(t *testing.T) {
-			db := new(allsrv.InmemDB)
+			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
 			svr := allsrv.NewServer(db,
 				allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"),
 				allsrv.WithIDFn(func() string {
@@ -63,7 +64,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo read", func(t *testing.T) {
 		t.Run("when querying for existing foo id should pass", func(t *testing.T) {
-			db := new(allsrv.InmemDB)
+			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
 			err := db.CreateFoo(allsrv.Foo{
 				ID:   "reader1",
 				Name: "read",
@@ -105,7 +106,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo update", func(t *testing.T) {
 		t.Run("when updating an existing foo with valid changes should pass", func(t *testing.T) {
-			db := new(allsrv.InmemDB)
+			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
 			err := db.CreateFoo(allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
@@ -156,7 +157,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo delete", func(t *testing.T) {
 		t.Run("when deleting an existing foo should pass", func(t *testing.T) {
-			db := new(allsrv.InmemDB)
+			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
 			err := db.CreateFoo(allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
@@ -207,4 +208,13 @@ func expectJSONBody[T any](t *testing.T, r io.Reader, assertFn func(t *testing.T
 	require.NoError(t, err)
 
 	assertFn(t, out)
+}
+
+func newTestMetrics(t *testing.T) *metrics.Metrics {
+	t.Helper()
+
+	met, err := metrics.New(&metrics.Config{}, &metrics.BlackholeSink{})
+	require.NoError(t, err)
+
+	return met
 }

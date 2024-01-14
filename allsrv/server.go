@@ -33,6 +33,9 @@ import (
 		a) there is nothing actionable, so how does the consumer know to handle the error?
 		b) if the APIs evolve, how does the consumer distinguish between old and new?
 	10) Observability....
+		a) metrics
+		b) logging
+		c) tracing
 	✅11) hard coding UUID generation into db
 	12) possible race conditions in inmem store
 	✅13) there is a bug in the delete foo inmem db implementation
