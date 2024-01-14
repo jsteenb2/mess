@@ -18,7 +18,9 @@ func TestServer(t *testing.T) {
 	t.Run("foo create", func(t *testing.T) {
 		t.Run("when provided a valid foo should pass", func(t *testing.T) {
 			db := new(allsrv.InmemDB)
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd", allsrv.WithIDFn(func() string {
+				return "id1"
+			}))
 			
 			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
 				Name: "first-foo",
@@ -31,11 +33,8 @@ func TestServer(t *testing.T) {
 			
 			assert.Equal(t, http.StatusCreated, rec.Code)
 			expectJSONBody(t, rec.Body, func(t *testing.T, got allsrv.Foo) {
-				assert.NotZero(t, got.ID)
-				got.ID = "" // this hurts :-(
-				
 				want := allsrv.Foo{
-					ID:   "", // ruh ohhh
+					ID:   "id1",
 					Name: "first-foo",
 					Note: "some note",
 				}

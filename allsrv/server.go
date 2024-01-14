@@ -34,7 +34,7 @@ import (
 		a) there is nothing actionable, so how does the consumer know to handle the error?
 		b) if the APIs evolve, how does the consumer distinguish between old and new?
 	10) Observability....
-	11) hard coding UUID generation into db
+	✅11) hard coding UUID generation into db
 	12) possible race conditions in inmem store
 
 	Praises:
@@ -48,14 +48,31 @@ type Server struct {
 	db *InmemDB // 1)
 	
 	user, pass string // 3)
+	
+	idFn func() string // 11)
 }
 
-func NewServer(db *InmemDB, user, pass string) *Server {
+// WithIDFn sets the id generation fn for the server.
+func WithIDFn(fn func() string) func(*Server) {
+	return func(s *Server) {
+		s.idFn = fn
+	}
+}
+
+func NewServer(db *InmemDB, user, pass string, opts ...func(*Server)) *Server {
 	s := Server{
 		db:   db,
 		user: user,
 		pass: pass,
+		idFn: func() string {
+			// defaults to using a uuid
+			return uuid.Must(uuid.NewV4()).String()
+		},
 	}
+	for _, o := range opts {
+		o(&s)
+	}
+	
 	s.routes()
 	return &s
 }
@@ -93,15 +110,10 @@ func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	newFooID, err := s.db.createFoo(f)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError) // 9)
-		return
-	}
+	f.ID = s.idFn() // 11)
 	
-	f, err = s.db.readFoo(newFooID)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound) // 9)
+	if err := s.db.createFoo(f); err != nil {
+		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
 	
@@ -166,18 +178,16 @@ type InmemDB struct {
 	m []Foo // 12)
 }
 
-func (db *InmemDB) createFoo(f Foo) (string, error) {
-	f.ID = uuid.Must(uuid.NewV4()).String() // 11)
-	
+func (db *InmemDB) createFoo(f Foo) error {
 	for _, existing := range db.m {
 		if f.Name == existing.Name {
-			return "", errors.New("foo " + f.Name + " exists") // 8)
+			return errors.New("foo " + f.Name + " exists") // 8)
 		}
 	}
 	
 	db.m = append(db.m, f)
 	
-	return f.ID, nil
+	return nil
 }
 
 func (db *InmemDB) readFoo(id string) (Foo, error) {
