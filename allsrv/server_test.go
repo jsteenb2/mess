@@ -41,6 +41,21 @@ func TestServer(t *testing.T) {
 				assert.Equal(t, want, got)
 			})
 		})
+
+		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
+			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+
+			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
+				Name: "first-foo",
+				Note: "some note",
+			}))
+			req.SetBasicAuth("dodgers@rule.com", "wrongO")
+			rec := httptest.NewRecorder()
+
+			svr.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		})
 	})
 
 	t.Run("foo read", func(t *testing.T) {
@@ -71,6 +86,18 @@ func TestServer(t *testing.T) {
 				assert.Equal(t, want, got)
 			})
 		})
+
+		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
+			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+
+			req := httptest.NewRequest("GET", "/foo?id=reader1", nil)
+			req.SetBasicAuth("dodgers@rule.com", "wrongO")
+			rec := httptest.NewRecorder()
+
+			svr.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		})
 	})
 
 	t.Run("foo update", func(t *testing.T) {
@@ -98,6 +125,30 @@ func TestServer(t *testing.T) {
 			// note: lame we don't get the updated foo back
 			assert.Equal(t, http.StatusOK, rec.Code)
 		})
+
+		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+			err := db.CreateFoo(allsrv.Foo{
+				ID:   "id1",
+				Name: "first_name",
+				Note: "first note",
+			})
+			require.NoError(t, err)
+
+			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+
+			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
+				ID:   "id1",
+				Name: "second_name",
+				Note: "second note",
+			}))
+			req.SetBasicAuth("dodgers@rule.com", "wrongO")
+			rec := httptest.NewRecorder()
+
+			svr.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		})
 	})
 
 	t.Run("foo delete", func(t *testing.T) {
@@ -119,6 +170,18 @@ func TestServer(t *testing.T) {
 			svr.ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusOK, rec.Code)
+		})
+
+		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
+			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+
+			req := httptest.NewRequest("DELETE", "/foo?id=id1", nil)
+			req.SetBasicAuth("dodgers@rule.com", "wrongO")
+			rec := httptest.NewRecorder()
+
+			svr.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		})
 	})
 }
