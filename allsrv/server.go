@@ -2,7 +2,6 @@ package allsrv
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 
@@ -12,7 +11,7 @@ import (
 /*
 
 	Concerns:
-	1) the server depends on a hard type, coupling to the exact inmem db
+	✅1) the server depends on a hard type, coupling to the exact inmem db
 		a) what happens if we want a different db?
 	✅2) auth is copy-pasted in each handler
 		a) what happens if we forget that copy pasta?
@@ -45,8 +44,19 @@ import (
 	4) is trivial in scope
 */
 
+// Server dependencies
+type (
+	// DB represents the foo persistence layer.
+	DB interface {
+		CreateFoo(f Foo) error
+		ReadFoo(id string) (Foo, error)
+		UpdateFoo(f Foo) error
+		DelFoo(id string) error
+	}
+)
+
 type Server struct {
-	db  *InmemDB       // 1)
+	db  DB             // 1)
 	mux *http.ServeMux // 4)
 
 	authFn func(http.Handler) http.Handler // 3)
@@ -68,7 +78,7 @@ func WithIDFn(fn func() string) func(*Server) {
 	}
 }
 
-func NewServer(db *InmemDB, opts ...func(*Server)) *Server {
+func NewServer(db DB, opts ...func(*Server)) *Server {
 	s := Server{
 		db:  db,
 		mux: http.NewServeMux(), // 4)
@@ -134,7 +144,7 @@ func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) readFoo(w http.ResponseWriter, r *http.Request) {
-	f, err := s.db.readFoo(r.URL.Query().Get("id"))
+	f, err := s.db.ReadFoo(r.URL.Query().Get("id"))
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound) // 9)
 		return
@@ -152,14 +162,14 @@ func (s *Server) updateFoo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.db.updateFoo(f); err != nil {
+	if err := s.db.UpdateFoo(f); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
 }
 
 func (s *Server) delFoo(w http.ResponseWriter, r *http.Request) {
-	if err := s.db.delFoo(r.URL.Query().Get("id")); err != nil {
+	if err := s.db.DelFoo(r.URL.Query().Get("id")); err != nil {
 		w.WriteHeader(http.StatusNotFound) // 9)
 		return
 	}
@@ -177,50 +187,4 @@ func basicAuth(expectedUser, expectedPass string) func(http.Handler) http.Handle
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// InmemDB is an in-memory store.
-type InmemDB struct {
-	m []Foo // 12)
-}
-
-func (db *InmemDB) CreateFoo(f Foo) error {
-	for _, existing := range db.m {
-		if f.Name == existing.Name {
-			return errors.New("foo " + f.Name + " exists") // 8)
-		}
-	}
-
-	db.m = append(db.m, f)
-
-	return nil
-}
-
-func (db *InmemDB) readFoo(id string) (Foo, error) {
-	for _, f := range db.m {
-		if id == f.ID {
-			return f, nil
-		}
-	}
-	return Foo{}, errors.New("foo not found for id: " + id) // 8)
-}
-
-func (db *InmemDB) updateFoo(f Foo) error {
-	for i, existing := range db.m {
-		if f.ID == existing.ID {
-			db.m[i] = f
-			return nil
-		}
-	}
-	return errors.New("foo not found for id: " + f.ID) // 8)
-}
-
-func (db *InmemDB) delFoo(id string) error {
-	for i, f := range db.m {
-		if id == f.ID {
-			db.m = append(db.m[:i], db.m[i+1:]...)
-			return nil // 13)
-		}
-	}
-	return errors.New("foo not found for id: " + id) // 8)
 }
