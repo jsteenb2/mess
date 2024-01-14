@@ -2,7 +2,6 @@ package allsrv
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
 
@@ -18,7 +17,7 @@ func (db *InmemDB) CreateFoo(_ context.Context, f Foo) error {
 
 	for _, existing := range db.m {
 		if f.Name == existing.Name {
-			return errors.New("foo " + f.Name + " exists") // 8)
+			return ExistsErr("foo "+f.Name+" exists", "name", f.Name, "existing_foo_id", existing.ID) // 8)
 		}
 	}
 
@@ -36,7 +35,7 @@ func (db *InmemDB) ReadFoo(_ context.Context, id string) (Foo, error) {
 			return f, nil
 		}
 	}
-	return Foo{}, errors.New("foo not found for id: " + id) // 8)
+	return Foo{}, NotFoundErr("foo not found for id: "+id, "id", id) // 8)
 }
 
 func (db *InmemDB) UpdateFoo(_ context.Context, f Foo) error {
@@ -49,7 +48,7 @@ func (db *InmemDB) UpdateFoo(_ context.Context, f Foo) error {
 			return nil
 		}
 	}
-	return errors.New("foo not found for id: " + f.ID) // 8)
+	return NotFoundErr("foo not found for id: "+f.ID, "id", f.ID) // 8)
 }
 
 func (db *InmemDB) DelFoo(_ context.Context, id string) error {
@@ -62,5 +61,5 @@ func (db *InmemDB) DelFoo(_ context.Context, id string) error {
 			return nil // 13)
 		}
 	}
-	return errors.New("foo not found for id: " + id) // 8)
+	return NotFoundErr("foo not found for id: "+id, "id", id) // 8)
 }

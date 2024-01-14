@@ -29,7 +29,7 @@ import (
 	7) Server only works with HTTP
 		a) what happens when we want to support grpc? thrift? other protocol?
 		b) this setup often leads to copy pasta/weak abstractions that tend to leak
-	8) Errors are opaque and limited
+	✅8) Errors are opaque and limited
 	9) API is very bare bones
 		a) there is nothing actionable, so how does the consumer know to handle the error?
 		b) if the APIs evolve, how does the consumer distinguish between old and new?

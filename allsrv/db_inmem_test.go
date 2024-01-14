@@ -69,7 +69,7 @@ func TestInmemDB(t *testing.T) {
 			// this is pretty gross, we're matching against a raw error/text value
 			// any change in the error message means we have to update tests too
 			wantErr := errors.New("foo collision exists")
-			assert.Equal(t, wantErr, err)
+			assert.Equal(t, wantErr.Error(), err.Error())
 		})
 	})
 
@@ -131,7 +131,7 @@ func TestInmemDB(t *testing.T) {
 			// this is pretty gross, we're matching against a raw error/text value
 			// any change in the error message means we have to update tests too
 			want := errors.New("foo not found for id: 1")
-			assert.Equal(t, want, err)
+			assert.Equal(t, want.Error(), err.Error())
 		})
 	})
 
@@ -201,7 +201,7 @@ func TestInmemDB(t *testing.T) {
 			// this is pretty gross, we're matching against a raw error/text value
 			// any change in the error message means we have to update tests too
 			want := errors.New("foo not found for id: 1")
-			assert.Equal(t, want, err)
+			assert.Equal(t, want.Error(), err.Error())
 		})
 	})
 
@@ -224,7 +224,7 @@ func TestInmemDB(t *testing.T) {
 			// this is pretty gross, we're matching against a raw error/text value
 			// any change in the error message means we have to update tests too
 			want := errors.New("foo not found for id: 1")
-			assert.Equal(t, want, err)
+			assert.Equal(t, want.Error(), err.Error())
 		})
 
 		t.Run("with concurrent valid foo creates should pass", func(t *testing.T) {
@@ -267,7 +267,7 @@ func TestInmemDB(t *testing.T) {
 			// this is pretty gross, we're matching against a raw error/text value
 			// any change in the error message means we have to update tests too
 			want := errors.New("foo not found for id: 1")
-			assert.Equal(t, want, err)
+			assert.Equal(t, want.Error(), err.Error())
 		})
 	})
 }
