@@ -1,6 +1,7 @@
 package allsrv
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -51,10 +52,10 @@ import (
 type (
 	// DB represents the foo persistence layer.
 	DB interface {
-		CreateFoo(f Foo) error
-		ReadFoo(id string) (Foo, error)
-		UpdateFoo(f Foo) error
-		DelFoo(id string) error
+		CreateFoo(ctx context.Context, f Foo) error
+		ReadFoo(ctx context.Context, id string) (Foo, error)
+		UpdateFoo(ctx context.Context, f Foo) error
+		DelFoo(ctx context.Context, id string) error
 	}
 )
 
@@ -135,7 +136,7 @@ func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
 
 	f.ID = s.idFn() // 11)
 
-	if err := s.db.CreateFoo(f); err != nil {
+	if err := s.db.CreateFoo(r.Context(), f); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
@@ -147,7 +148,7 @@ func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) readFoo(w http.ResponseWriter, r *http.Request) {
-	f, err := s.db.ReadFoo(r.URL.Query().Get("id"))
+	f, err := s.db.ReadFoo(r.Context(), r.URL.Query().Get("id"))
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound) // 9)
 		return
@@ -165,14 +166,14 @@ func (s *Server) updateFoo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.db.UpdateFoo(f); err != nil {
+	if err := s.db.UpdateFoo(r.Context(), f); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
 }
 
 func (s *Server) delFoo(w http.ResponseWriter, r *http.Request) {
-	if err := s.db.DelFoo(r.URL.Query().Get("id")); err != nil {
+	if err := s.db.DelFoo(r.Context(), r.URL.Query().Get("id")); err != nil {
 		w.WriteHeader(http.StatusNotFound) // 9)
 		return
 	}

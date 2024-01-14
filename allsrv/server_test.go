@@ -2,6 +2,7 @@ package allsrv_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -65,7 +66,7 @@ func TestServer(t *testing.T) {
 	t.Run("foo read", func(t *testing.T) {
 		t.Run("when querying for existing foo id should pass", func(t *testing.T) {
 			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
-			err := db.CreateFoo(allsrv.Foo{
+			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "reader1",
 				Name: "read",
 				Note: "another note",
@@ -107,7 +108,7 @@ func TestServer(t *testing.T) {
 	t.Run("foo update", func(t *testing.T) {
 		t.Run("when updating an existing foo with valid changes should pass", func(t *testing.T) {
 			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
-			err := db.CreateFoo(allsrv.Foo{
+			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
 				Note: "first note",
@@ -132,7 +133,7 @@ func TestServer(t *testing.T) {
 
 		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
 			db := new(allsrv.InmemDB)
-			err := db.CreateFoo(allsrv.Foo{
+			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
 				Note: "first note",
@@ -158,7 +159,7 @@ func TestServer(t *testing.T) {
 	t.Run("foo delete", func(t *testing.T) {
 		t.Run("when deleting an existing foo should pass", func(t *testing.T) {
 			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
-			err := db.CreateFoo(allsrv.Foo{
+			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
 				Note: "first note",

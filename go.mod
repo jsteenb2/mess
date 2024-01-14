@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/hashicorp/go-metrics v0.5.3
+	github.com/opentracing/opentracing-go v1.2.0
 	github.com/stretchr/testify v1.8.4
 )
 

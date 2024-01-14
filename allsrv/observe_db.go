@@ -1,9 +1,11 @@
 package allsrv
 
 import (
+	"context"
 	"time"
 
 	"github.com/hashicorp/go-metrics"
+	"github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -27,25 +29,37 @@ type dbMW struct {
 	met  *metrics.Metrics
 }
 
-func (d *dbMW) CreateFoo(f Foo) error {
+func (d *dbMW) CreateFoo(ctx context.Context, f Foo) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_create")
+	defer span.Finish()
+
 	rec := d.record("create")
-	return rec(d.next.CreateFoo(f))
+	return rec(d.next.CreateFoo(ctx, f))
 }
 
-func (d *dbMW) ReadFoo(id string) (Foo, error) {
+func (d *dbMW) ReadFoo(ctx context.Context, id string) (Foo, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_read")
+	defer span.Finish()
+
 	rec := d.record("read")
-	f, err := d.next.ReadFoo(id)
+	f, err := d.next.ReadFoo(ctx, id)
 	return f, rec(err)
 }
 
-func (d *dbMW) UpdateFoo(f Foo) error {
+func (d *dbMW) UpdateFoo(ctx context.Context, f Foo) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_update")
+	defer span.Finish()
+
 	rec := d.record("update")
-	return rec(d.next.UpdateFoo(f))
+	return rec(d.next.UpdateFoo(ctx, f))
 }
 
-func (d *dbMW) DelFoo(id string) error {
+func (d *dbMW) DelFoo(ctx context.Context, id string) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_delete")
+	defer span.Finish()
+
 	rec := d.record("delete")
-	return rec(d.next.DelFoo(id))
+	return rec(d.next.DelFoo(ctx, id))
 }
 
 func (d *dbMW) record(op string) func(error) error {
