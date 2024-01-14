@@ -112,7 +112,7 @@ func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
 	
 	f.ID = s.idFn() // 11)
 	
-	if err := s.db.createFoo(f); err != nil {
+	if err := s.db.CreateFoo(f); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
@@ -178,7 +178,7 @@ type InmemDB struct {
 	m []Foo // 12)
 }
 
-func (db *InmemDB) createFoo(f Foo) error {
+func (db *InmemDB) CreateFoo(f Foo) error {
 	for _, existing := range db.m {
 		if f.Name == existing.Name {
 			return errors.New("foo " + f.Name + " exists") // 8)
