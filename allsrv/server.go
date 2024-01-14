@@ -16,7 +16,7 @@ import (
 		a) what happens if we want a different db?
 	✅2) auth is copy-pasted in each handler
 		a) what happens if we forget that copy pasta?
-	3) auth is hardcoded to basic auth
+	✅3) auth is hardcoded to basic auth
 		a) what happens if we want to adapt some other means of auth?
 	✅4) router being used is the GLOBAL http.DefaultServeMux
 		a) should avoid globals
@@ -49,9 +49,16 @@ type Server struct {
 	db  *InmemDB       // 1)
 	mux *http.ServeMux // 4)
 
-	user, pass string // 3)
+	authFn func(http.Handler) http.Handler // 3)
+	idFn   func() string                   // 11)
+}
 
-	idFn func() string // 11)
+// WithBasicAuth sets the authorization fn for the server to basic auth.
+// 3)
+func WithBasicAuth(user, pass string) func(*Server) {
+	return func(s *Server) {
+		s.authFn = basicAuth(user, pass)
+	}
 }
 
 // WithIDFn sets the id generation fn for the server.
@@ -61,12 +68,16 @@ func WithIDFn(fn func() string) func(*Server) {
 	}
 }
 
-func NewServer(db *InmemDB, user, pass string, opts ...func(*Server)) *Server {
+func NewServer(db *InmemDB, opts ...func(*Server)) *Server {
 	s := Server{
-		db:   db,
-		mux:  http.NewServeMux(), // 4)
-		user: user,
-		pass: pass,
+		db:  db,
+		mux: http.NewServeMux(), // 4)
+		authFn: func(next http.Handler) http.Handler { // 3)
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// defaults to no auth
+				next.ServeHTTP(w, r)
+			})
+		},
 		idFn: func() string {
 			// defaults to using a uuid
 			return uuid.Must(uuid.NewV4()).String()
@@ -81,7 +92,7 @@ func NewServer(db *InmemDB, user, pass string, opts ...func(*Server)) *Server {
 }
 
 func (s *Server) routes() {
-	authMW := BasicAuth(s.user, s.pass) // 2)
+	authMW := s.authFn // 2)
 
 	// 4) 7) 9) 10)
 	s.mux.Handle("POST /foo", authMW(http.HandlerFunc(s.createFoo)))
@@ -154,9 +165,9 @@ func (s *Server) delFoo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// BasicAuth provides a basic auth middleware to an http server.
+// basicAuth provides a basic auth middleware to an http server.
 // 2)
-func BasicAuth(expectedUser, expectedPass string) func(http.Handler) http.Handler {
+func basicAuth(expectedUser, expectedPass string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if user, pass, ok := r.BasicAuth(); !(ok && user == expectedUser && pass == expectedPass) {

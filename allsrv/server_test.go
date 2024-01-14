@@ -18,9 +18,12 @@ func TestServer(t *testing.T) {
 	t.Run("foo create", func(t *testing.T) {
 		t.Run("when provided a valid foo should pass", func(t *testing.T) {
 			db := new(allsrv.InmemDB)
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd", allsrv.WithIDFn(func() string {
-				return "id1"
-			}))
+			svr := allsrv.NewServer(db,
+				allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"),
+				allsrv.WithIDFn(func() string {
+					return "id1"
+				}),
+			)
 
 			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
 				Name: "first-foo",
@@ -43,7 +46,7 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
-			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(new(allsrv.InmemDB), allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
 				Name: "first-foo",
@@ -68,7 +71,7 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("GET", "/foo?id=reader1", nil)
 			req.SetBasicAuth("dodgers@stink.com", "PaSsWoRd")
@@ -88,7 +91,7 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
-			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(new(allsrv.InmemDB), allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("GET", "/foo?id=reader1", nil)
 			req.SetBasicAuth("dodgers@rule.com", "wrongO")
@@ -110,7 +113,7 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
 				ID:   "id1",
@@ -135,7 +138,7 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
 				ID:   "id1",
@@ -161,7 +164,7 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("DELETE", "/foo?id=id1", nil)
 			req.SetBasicAuth("dodgers@stink.com", "PaSsWoRd")
@@ -173,7 +176,7 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
-			svr := allsrv.NewServer(new(allsrv.InmemDB), "dodgers@stink.com", "PaSsWoRd")
+			svr := allsrv.NewServer(new(allsrv.InmemDB), allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
 			req := httptest.NewRequest("DELETE", "/foo?id=id1", nil)
 			req.SetBasicAuth("dodgers@rule.com", "wrongO")
