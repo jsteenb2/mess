@@ -19,13 +19,15 @@ import (
 func TestServer(t *testing.T) {
 	t.Run("foo create", func(t *testing.T) {
 		t.Run("when provided a valid foo should pass", func(t *testing.T) {
-			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
-			svr := allsrv.NewServer(db,
+			met := newTestMetrics(t)
+			db := allsrv.ObserveDB("inmem", met)(new(allsrv.InmemDB))
+			var svr http.Handler = allsrv.NewServer(db,
 				allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"),
 				allsrv.WithIDFn(func() string {
 					return "id1"
 				}),
 			)
+			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
 			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
 				Name: "first-foo",
@@ -65,7 +67,8 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo read", func(t *testing.T) {
 		t.Run("when querying for existing foo id should pass", func(t *testing.T) {
-			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
+			met := newTestMetrics(t)
+			db := allsrv.ObserveDB("inmem", met)(new(allsrv.InmemDB))
 			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "reader1",
 				Name: "read",
@@ -73,7 +76,8 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			var svr http.Handler = allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
 			req := httptest.NewRequest("GET", "/foo?id=reader1", nil)
 			req.SetBasicAuth("dodgers@stink.com", "PaSsWoRd")
@@ -107,7 +111,8 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo update", func(t *testing.T) {
 		t.Run("when updating an existing foo with valid changes should pass", func(t *testing.T) {
-			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
+			met := newTestMetrics(t)
+			db := allsrv.ObserveDB("inmem", met)(new(allsrv.InmemDB))
 			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
@@ -115,7 +120,8 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			var svr http.Handler = allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
 			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
 				ID:   "id1",
@@ -158,7 +164,8 @@ func TestServer(t *testing.T) {
 
 	t.Run("foo delete", func(t *testing.T) {
 		t.Run("when deleting an existing foo should pass", func(t *testing.T) {
-			db := allsrv.ObserveDB("inmem", newTestMetrics(t))(new(allsrv.InmemDB))
+			met := newTestMetrics(t)
+			db := allsrv.ObserveDB("inmem", met)(new(allsrv.InmemDB))
 			err := db.CreateFoo(context.TODO(), allsrv.Foo{
 				ID:   "id1",
 				Name: "first_name",
@@ -166,7 +173,8 @@ func TestServer(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			var svr http.Handler = allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
+			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
 			req := httptest.NewRequest("DELETE", "/foo?id=id1", nil)
 			req.SetBasicAuth("dodgers@stink.com", "PaSsWoRd")
