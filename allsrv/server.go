@@ -21,7 +21,7 @@ import (
 	✅4) router being used is the GLOBAL http.DefaultServeMux
 		a) should avoid globals
 		b) what happens if you have multiple servers in this go module who reference default serve mux?
-	5) no tests
+	✅5) no tests
 		a) how do we ensure things work?
 		b) how do we know what is intended by the current implementation?
 	6) http/db are coupled to the same type
@@ -38,7 +38,7 @@ import (
 		b) logging
 		✅c) tracing
 	✅11) hard coding UUID generation into db
-	12) possible race conditions in inmem store
+	✅12) possible race conditions in inmem store
 	✅13) there is a bug in the delete foo inmem db implementation
 
 	Praises:

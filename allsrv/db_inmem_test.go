@@ -3,6 +3,7 @@ package allsrv_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,28 @@ func TestInmemDB(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, want, got)
+		})
+
+		t.Run("with concurrent valid foo creates should pass", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+
+			newFoo := func(id string) allsrv.Foo {
+				return allsrv.Foo{
+					ID:   id,
+					Name: "name-" + id,
+					Note: "note-" + id,
+				}
+			}
+
+			var wg sync.WaitGroup
+			for _, f := range []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")} {
+				wg.Add(1)
+				go func(f allsrv.Foo) {
+					defer wg.Done()
+					require.NoError(t, db.CreateFoo(context.TODO(), f))
+				}(f)
+			}
+			wg.Wait()
 		})
 
 		t.Run("with foo containing name that already exists should fail", func(t *testing.T) {
@@ -68,6 +91,38 @@ func TestInmemDB(t *testing.T) {
 			assert.Equal(t, want, got)
 		})
 
+		t.Run("with concurrent valid foo update the reading should pass", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+			require.NoError(t, db.CreateFoo(context.TODO(), allsrv.Foo{
+				ID:   "1",
+				Name: "one",
+				Note: "note",
+			}))
+
+			newFoo := func(note string) allsrv.Foo {
+				return allsrv.Foo{
+					ID:   "1",
+					Name: "one",
+					Note: note,
+				}
+			}
+
+			var wg sync.WaitGroup
+			for _, f := range []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")} {
+				wg.Add(1)
+				go func(f allsrv.Foo) {
+					defer wg.Done()
+					require.NoError(t, db.UpdateFoo(context.TODO(), f))
+				}(f)
+			}
+
+			got, err := db.ReadFoo(context.TODO(), "1")
+			require.NoError(t, err)
+
+			assert.Contains(t, []string{"note", "a", "b", "c", "d", "e"}, got.Note)
+			wg.Wait()
+		})
+
 		t.Run("with id for non-existent foo should fail", func(t *testing.T) {
 			db := new(allsrv.InmemDB)
 
@@ -100,6 +155,38 @@ func TestInmemDB(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, want, got)
+		})
+
+		t.Run("with concurrent valid foo updates should pass", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+			require.NoError(t, db.CreateFoo(context.TODO(), allsrv.Foo{
+				ID:   "1",
+				Name: "one",
+				Note: "note",
+			}))
+
+			newFoo := func(note string) allsrv.Foo {
+				return allsrv.Foo{
+					ID:   "1",
+					Name: "one",
+					Note: note,
+				}
+			}
+
+			var wg sync.WaitGroup
+			for _, f := range []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")} {
+				wg.Add(1)
+				go func(f allsrv.Foo) {
+					defer wg.Done()
+					require.NoError(t, db.UpdateFoo(context.TODO(), f))
+				}(f)
+			}
+
+			got, err := db.ReadFoo(context.TODO(), "1")
+			require.NoError(t, err)
+			wg.Wait()
+
+			assert.Contains(t, []string{"note", "a", "b", "c", "d", "e"}, got.Note)
 		})
 
 		t.Run("with update for non-existent foo should fail", func(t *testing.T) {
@@ -138,6 +225,38 @@ func TestInmemDB(t *testing.T) {
 			// any change in the error message means we have to update tests too
 			want := errors.New("foo not found for id: 1")
 			assert.Equal(t, want, err)
+		})
+
+		t.Run("with concurrent valid foo creates should pass", func(t *testing.T) {
+			db := new(allsrv.InmemDB)
+
+			newFoo := func(id string) allsrv.Foo {
+				return allsrv.Foo{
+					ID:   id,
+					Name: "name-" + id,
+					Note: "note-" + id,
+				}
+			}
+
+			for _, f := range []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")} {
+				require.NoError(t, db.CreateFoo(context.TODO(), f))
+			}
+
+			var wg sync.WaitGroup
+			for _, id := range []string{"1", "2", "3", "4", "5"} {
+				wg.Add(1)
+				go func(id string) {
+					defer wg.Done()
+					require.NoError(t, db.DelFoo(context.TODO(), id))
+				}(id)
+			}
+			wg.Wait()
+
+			for _, id := range []string{"1", "2", "3", "4", "5"} {
+				err := db.DelFoo(context.TODO(), id)
+				wantErr := errors.New("foo not found for id: " + id)
+				require.Error(t, wantErr, err)
+			}
 		})
 
 		t.Run("with id for non-existent foo should fail", func(t *testing.T) {
