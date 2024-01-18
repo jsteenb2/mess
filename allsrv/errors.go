@@ -1,15 +1,18 @@
 package allsrv
 
 const (
-	errTypeExists   = "exists"
-	errTypeNotFound = "not found"
+	errTypeUnknown = iota
+	errTypeExists
+	errTypeInvalid
+	errTypeNotFound
+	errTypeUnAuthed
 )
 
 // Err provides a lightly structured error that we can attach behavior. Additionally,
 // the use of fields makes it possible for us to enrich our logging infra without
 // blowing up the message cardinality.
 type Err struct {
-	Type   string
+	Type   int
 	Msg    string
 	Fields []any
 }

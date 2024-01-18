@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/hashicorp/go-metrics"
 )
 
 /*
@@ -59,6 +61,30 @@ type (
 	}
 )
 
+type serverOpts struct {
+	authFn func(http.Handler) http.Handler
+	idFn   func() string
+	nowFn  func() time.Time
+
+	met *metrics.Metrics
+	mux *http.ServeMux
+}
+
+// WithBasicAuth sets the authorization fn for the server to basic auth.
+// 3)
+func WithBasicAuth(user, pass string) func(*serverOpts) {
+	return func(s *serverOpts) {
+		s.authFn = basicAuth(user, pass)
+	}
+}
+
+// WithIDFn sets the id generation fn for the server.
+func WithIDFn(fn func() string) func(*serverOpts) {
+	return func(s *serverOpts) {
+		s.idFn = fn
+	}
+}
+
 type Server struct {
 	db  DB             // 1)
 	mux *http.ServeMux // 4)
@@ -67,25 +93,8 @@ type Server struct {
 	idFn   func() string                   // 11)
 }
 
-// WithBasicAuth sets the authorization fn for the server to basic auth.
-// 3)
-func WithBasicAuth(user, pass string) func(*Server) {
-	return func(s *Server) {
-		s.authFn = basicAuth(user, pass)
-	}
-}
-
-// WithIDFn sets the id generation fn for the server.
-func WithIDFn(fn func() string) func(*Server) {
-	return func(s *Server) {
-		s.idFn = fn
-	}
-}
-
-func NewServer(db DB, opts ...func(*Server)) *Server {
-	s := Server{
-		db:  db,
-		mux: http.NewServeMux(), // 4)
+func NewServer(db DB, opts ...func(*serverOpts)) *Server {
+	opt := serverOpts{
 		authFn: func(next http.Handler) http.Handler { // 3)
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// defaults to no auth
@@ -96,9 +105,17 @@ func NewServer(db DB, opts ...func(*Server)) *Server {
 			// defaults to using a uuid
 			return uuid.Must(uuid.NewV4()).String()
 		},
+		mux: http.NewServeMux(),
 	}
 	for _, o := range opts {
-		o(&s)
+		o(&opt)
+	}
+
+	s := Server{
+		db:     db,
+		mux:    opt.mux, // 4)
+		authFn: opt.authFn,
+		idFn:   opt.idFn,
 	}
 
 	s.routes()
@@ -122,9 +139,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type Foo struct {
 	// 6)
-	ID   string `json:"id" gorm:"id"`
-	Name string `json:"name" gorm:"name"`
-	Note string `json:"note" gorm:"note"`
+	ID        string    `json:"id" gorm:"id"`
+	Name      string    `json:"name" gorm:"name"`
+	Note      string    `json:"note" gorm:"note"`
+	CreatedAt time.Time `json:"-" gorm:"created_at"`
 }
 
 func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
