@@ -6,6 +6,7 @@ const (
 	errTypeInvalid
 	errTypeNotFound
 	errTypeUnAuthed
+	errTypeInternal
 )
 
 // Err provides a lightly structured error that we can attach behavior. Additionally,
@@ -38,4 +39,9 @@ func NotFoundErr(msg string, fields ...any) error {
 		Msg:    msg,
 		Fields: fields,
 	}
+}
+
+func isErrType(err error, want int) bool {
+	e, _ := err.(Err)
+	return err != nil && e.Type == want
 }

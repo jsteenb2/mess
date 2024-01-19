@@ -11,19 +11,21 @@ import (
 	"github.com/hashicorp/go-metrics"
 )
 
-func WithMetrics(mets *metrics.Metrics) func(*serverOpts) {
+type SvrOptFn func(o *serverOpts)
+
+func WithMetrics(mets *metrics.Metrics) SvrOptFn {
 	return func(o *serverOpts) {
 		o.met = mets
 	}
 }
 
-func WithMux(mux *http.ServeMux) func(*serverOpts) {
+func WithMux(mux *http.ServeMux) SvrOptFn {
 	return func(o *serverOpts) {
 		o.mux = mux
 	}
 }
 
-func WithNowFn(fn func() time.Time) func(*serverOpts) {
+func WithNowFn(fn func() time.Time) SvrOptFn {
 	return func(o *serverOpts) {
 		o.nowFn = fn
 	}
@@ -38,7 +40,7 @@ type ServerV2 struct {
 	nowFn func() time.Time
 }
 
-func NewServerV2(db DB, opts ...func(*serverOpts)) *ServerV2 {
+func NewServerV2(db DB, opts ...SvrOptFn) *ServerV2 {
 	opt := serverOpts{
 		mux:   http.NewServeMux(),
 		idFn:  func() string { return uuid.Must(uuid.NewV4()).String() },
@@ -76,7 +78,7 @@ func (s *ServerV2) routes() {
 	withContentTypeJSON := applyMW(contentTypeJSON, s.mw)
 
 	// 9)
-	s.mux.Handle("POST /v1/foos", withContentTypeJSON(jsonIn(http.StatusCreated, s.createFooV1)))
+	s.mux.Handle("POST /v1/foos", withContentTypeJSON(jsonIn(resourceTypeFoo, http.StatusCreated, s.createFooV1)))
 }
 
 func (s *ServerV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -90,20 +92,15 @@ type (
 	// 	https://jsonapi.org/format/#document-top-level
 	//
 	// note: data can be either an array or a single resource object. This allows for both.
-	RespResourceBody[Attrs any | []any] struct {
-		Meta RespMeta         `json:"meta"`
-		Errs []RespErr        `json:"errors,omitempty"`
-		Data *RespData[Attrs] `json:"data,omitempty"`
+	RespResourceBody[Attr Attrs] struct {
+		Meta RespMeta    `json:"meta"`
+		Errs []RespErr   `json:"errors,omitempty"`
+		Data *Data[Attr] `json:"data,omitempty"`
 	}
 
-	// RespData represents a JSON-API data response.
-	//	https://jsonapi.org/format/#document-top-level
-	RespData[Attr any | []Attr] struct {
-		Type       string `json:"type"`
-		ID         string `json:"id"`
-		Attributes Attr   `json:"attributes"`
-
-		// omitting the relationships here for brevity not at lvl 3 RMM
+	// Attrs can be either a document or a collection of documents.
+	Attrs interface {
+		any | []Attrs
 	}
 
 	// RespMeta represents a JSON-API meta object. The data here is
@@ -135,30 +132,47 @@ type (
 	}
 )
 
-type (
-	// ReqCreateFooV1 represents the request body for the create foo API.
-	ReqCreateFooV1 struct {
-		Name string `json:"name"`
-		Note string `json:"note"`
-	}
+// Data represents a JSON-API data response.
+//
+//	https://jsonapi.org/format/#document-top-level
+type Data[Attr Attrs] struct {
+	Type  string `json:"type"`
+	ID    string `json:"id"`
+	Attrs Attr   `json:"attributes"`
 
-	// FooAttrs are the attributes for foo data.
-	FooAttrs struct {
-		Name      string `json:"name"`
-		Note      string `json:"note"`
-		CreatedAt string `json:"created_at"`
-	}
+	// omitting the relationships here for brevity not at lvl 3 RMM
+}
+
+func (d Data[Attr]) getType() string {
+	return d.Type
+}
+
+const (
+	resourceTypeFoo = "foo"
 )
 
-func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (RespData[FooAttrs], []RespErr) {
+type ReqCreateFooV1 = Data[FooAttrs]
+
+// FooAttrs are the attributes of a foo resource.
+type FooAttrs struct {
+	Name      string `json:"name"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"created_at"`
+}
+
+func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (Data[FooAttrs], []RespErr) {
 	newFoo := Foo{
 		ID:        s.idFn(),
-		Name:      req.Name,
-		Note:      req.Note,
+		Name:      req.Attrs.Name,
+		Note:      req.Attrs.Note,
 		CreatedAt: s.nowFn(),
 	}
 	if err := s.db.CreateFoo(ctx, newFoo); err != nil {
-		return RespData[FooAttrs]{}, toRespErrs(err)
+		respErr := toRespErr(err)
+		if isErrType(err, errTypeExists) {
+			respErr.Source = &RespErrSource{Pointer: "/data/attributes/name"}
+		}
+		return Data[FooAttrs]{}, []RespErr{respErr}
 	}
 
 	out := newFooData(newFoo.ID, FooAttrs{
@@ -169,11 +183,11 @@ func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (RespDat
 	return out, nil
 }
 
-func newFooData(id string, attrs FooAttrs) RespData[FooAttrs] {
-	return RespData[FooAttrs]{
-		Type:       "foo",
-		ID:         id,
-		Attributes: attrs,
+func newFooData(id string, attrs FooAttrs) Data[FooAttrs] {
+	return Data[FooAttrs]{
+		Type:  resourceTypeFoo,
+		ID:    id,
+		Attrs: attrs,
 	}
 }
 
@@ -181,17 +195,36 @@ func toTimestamp(t time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-func jsonIn[ReqBody, Attr any](successCode int, fn func(context.Context, ReqBody) (RespData[Attr], []RespErr)) http.Handler {
+func jsonIn[
+	Attr Attrs,
+	ReqBody interface {
+		Data[Attr]
+		// this is limited by go's generics in a big way, which is very unfortunate :-(
+		//	https://github.com/golang/go/issues/48522
+		getType() string
+	},
+](resource string, successCode int, fn func(context.Context, ReqBody) (Data[Attr], []RespErr)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
 			reqBody ReqBody
 			errs    []RespErr
-			out     *RespData[Attr]
+			out     *Data[Attr]
 		)
 		if respErr := decodeReq(r, &reqBody); respErr != nil {
 			errs = append(errs, *respErr)
-		} else {
-			var data RespData[Attr]
+		}
+		if len(errs) == 0 && reqBody.getType() != resource {
+			errs = append(errs, RespErr{
+				Status: http.StatusUnprocessableEntity,
+				Code:   errTypeInvalid,
+				Msg:    "type must be " + resource,
+				Source: &RespErrSource{
+					Pointer: "/data/type",
+				},
+			})
+		}
+		if len(errs) == 0 {
+			var data Data[Attr]
 			data, errs = fn(r.Context(), reqBody)
 			if len(errs) == 0 {
 				out = &data
@@ -225,7 +258,7 @@ func decodeReq(r *http.Request, v any) *RespErr {
 			Code: errTypeInvalid,
 		}
 		if unmarshErr := new(json.UnmarshalTypeError); errors.As(err, &unmarshErr) {
-			respErr.Source.Pointer += "/attributes/" + unmarshErr.Field
+			respErr.Source.Pointer += "/data"
 		}
 		return &respErr
 	}
@@ -233,28 +266,19 @@ func decodeReq(r *http.Request, v any) *RespErr {
 	return nil
 }
 
-func toRespErrs(err error) []RespErr {
+func toRespErr(err error) RespErr {
+	out := RespErr{
+		Status: http.StatusInternalServerError,
+		Code:   errTypeInternal,
+		Msg:    err.Error(),
+	}
 	if e := new(Err); errors.As(err, e) {
-		return []RespErr{{
-			Code: errCode(e),
-			Msg:  e.Msg,
-		}}
+		out.Status, out.Code = errStatus(e), e.Type
 	}
-
-	errs, ok := err.(interface{ Unwrap() []error })
-	if !ok {
-		return nil
-	}
-
-	var out []RespErr
-	for _, e := range errs.Unwrap() {
-		out = append(out, toRespErrs(e)...)
-	}
-
 	return out
 }
 
-func errCode(err *Err) int {
+func errStatus(err *Err) int {
 	switch err.Type {
 	case errTypeExists:
 		return http.StatusConflict
