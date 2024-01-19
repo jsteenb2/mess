@@ -123,13 +123,13 @@ func NewServer(db DB, opts ...func(*serverOpts)) *Server {
 }
 
 func (s *Server) routes() {
-	authMW := s.authFn // 2)
+	mw := applyMW(s.authFn, deprecationHeaders) // 2)
 
 	// 4) 7) 9) 10)
-	s.mux.Handle("POST /foo", authMW(http.HandlerFunc(s.createFoo)))
-	s.mux.Handle("GET /foo", authMW(http.HandlerFunc(s.readFoo)))
-	s.mux.Handle("PUT /foo", authMW(http.HandlerFunc(s.updateFoo)))
-	s.mux.Handle("DELETE /foo", authMW(http.HandlerFunc(s.delFoo)))
+	s.mux.Handle("POST /foo", mw(http.HandlerFunc(s.createFoo)))
+	s.mux.Handle("GET /foo", mw(http.HandlerFunc(s.readFoo)))
+	s.mux.Handle("PUT /foo", mw(http.HandlerFunc(s.updateFoo)))
+	s.mux.Handle("DELETE /foo", mw(http.HandlerFunc(s.delFoo)))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -210,4 +210,11 @@ func basicAuth(expectedUser, expectedPass string) func(http.Handler) http.Handle
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func deprecationHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Deprecation", "Fri, 26 July 2024 23:59:59 GMT")
+		next.ServeHTTP(w, r)
+	})
 }
