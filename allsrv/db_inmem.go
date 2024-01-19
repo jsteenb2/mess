@@ -42,6 +42,12 @@ func (db *InmemDB) UpdateFoo(_ context.Context, f Foo) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	for _, existing := range db.m {
+		if existing.Name == f.Name && existing.ID != f.ID {
+			return ExistsErr("foo "+f.Name+" exists", "name", f.Name, "existing_foo_id", existing.ID) // 8)
+		}
+	}
+
 	for i, existing := range db.m {
 		if f.ID == existing.ID {
 			db.m[i] = f

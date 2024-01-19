@@ -79,6 +79,9 @@ func (s *ServerV2) routes() {
 
 	// 9)
 	s.mux.Handle("POST /v1/foos", withContentTypeJSON(jsonIn(resourceTypeFoo, http.StatusCreated, s.createFooV1)))
+	s.mux.Handle("GET /v1/foos/{id}", s.mw(read(s.readFooV1)))
+	s.mux.Handle("PATCH /v1/foos", withContentTypeJSON(jsonIn(resourceTypeFoo, http.StatusOK, s.updateFooV1)))
+	s.mux.Handle("DELETE /v1/foos/{id}", s.mw(del(s.delFooV1)))
 }
 
 func (s *ServerV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -88,11 +91,11 @@ func (s *ServerV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // API envelope types
 type (
-	// RespResourceBody represents a JSON-API response body.
+	// RespBody represents a JSON-API response body.
 	// 	https://jsonapi.org/format/#document-top-level
 	//
 	// note: data can be either an array or a single resource object. This allows for both.
-	RespResourceBody[Attr Attrs] struct {
+	RespBody[Attr Attrs] struct {
 		Meta RespMeta    `json:"meta"`
 		Errs []RespErr   `json:"errors,omitempty"`
 		Data *Data[Attr] `json:"data,omitempty"`
@@ -130,6 +133,12 @@ type (
 		Parameter string `json:"parameter,omitempty"`
 		Header    string `json:"header,omitempty"`
 	}
+
+	// ReqBody represents a JSON-API request body.
+	//	https://jsonapi.org/format/#crud-creating
+	ReqBody[Attr Attrs] struct {
+		Data Data[Attr] `json:"data"`
+	}
 )
 
 // Data represents a JSON-API data response.
@@ -151,40 +160,110 @@ const (
 	resourceTypeFoo = "foo"
 )
 
-type ReqCreateFooV1 = Data[FooAttrs]
+type (
+	ReqCreateFooV1 = ReqBody[FooCreateAttrs]
 
-// FooAttrs are the attributes of a foo resource.
-type FooAttrs struct {
-	Name      string `json:"name"`
-	Note      string `json:"note"`
-	CreatedAt string `json:"created_at"`
-}
+	FooCreateAttrs struct {
+		Name string `json:"name"`
+		Note string `json:"note"`
+	}
 
-func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (Data[FooAttrs], []RespErr) {
+	// ResourceFooAttrs are the attributes of a foo resource.
+	ResourceFooAttrs struct {
+		Name      string `json:"name"`
+		Note      string `json:"note"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+	}
+)
+
+func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (*Data[ResourceFooAttrs], []RespErr) {
+	now := s.nowFn()
 	newFoo := Foo{
 		ID:        s.idFn(),
-		Name:      req.Attrs.Name,
-		Note:      req.Attrs.Note,
-		CreatedAt: s.nowFn(),
+		Name:      req.Data.Attrs.Name,
+		Note:      req.Data.Attrs.Note,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	if err := s.db.CreateFoo(ctx, newFoo); err != nil {
 		respErr := toRespErr(err)
 		if isErrType(err, errTypeExists) {
 			respErr.Source = &RespErrSource{Pointer: "/data/attributes/name"}
 		}
-		return Data[FooAttrs]{}, []RespErr{respErr}
+		return nil, []RespErr{respErr}
 	}
 
-	out := newFooData(newFoo.ID, FooAttrs{
-		Name:      newFoo.Name,
-		Note:      newFoo.Note,
-		CreatedAt: toTimestamp(newFoo.CreatedAt),
-	})
-	return out, nil
+	out := fooToData(newFoo)
+	return &out, nil
 }
 
-func newFooData(id string, attrs FooAttrs) Data[FooAttrs] {
-	return Data[FooAttrs]{
+func (s *ServerV2) readFooV1(ctx context.Context, r *http.Request) (*Data[ResourceFooAttrs], []RespErr) {
+	id := r.PathValue("id")
+	f, err := s.db.ReadFoo(ctx, id)
+	if err != nil {
+		return nil, []RespErr{toRespErr(err)}
+	}
+
+	out := fooToData(f)
+	return &out, nil
+}
+
+type (
+	ReqUpdateFooV1 = ReqBody[FooUpdAttrs]
+
+	FooUpdAttrs struct {
+		Name *string `json:"name"`
+		Note *string `json:"note"`
+	}
+)
+
+func (s *ServerV2) updateFooV1(ctx context.Context, req ReqUpdateFooV1) (*Data[ResourceFooAttrs], []RespErr) {
+	existing, err := s.db.ReadFoo(ctx, req.Data.ID)
+	if err != nil {
+		return nil, []RespErr{toRespErr(err)}
+	}
+
+	if newName := req.Data.Attrs.Name; newName != nil {
+		existing.Name = *newName
+	}
+	if newNote := req.Data.Attrs.Note; newNote != nil {
+		existing.Note = *newNote
+	}
+	existing.UpdatedAt = s.nowFn()
+
+	err = s.db.UpdateFoo(ctx, existing)
+	if err != nil {
+		respErr := toRespErr(err)
+		if isErrType(err, errTypeExists) {
+			respErr.Source = &RespErrSource{Pointer: "/data/attributes/name"}
+		}
+		return nil, []RespErr{respErr}
+	}
+
+	out := fooToData(existing)
+	return &out, nil
+}
+
+func (s *ServerV2) delFooV1(ctx context.Context, r *http.Request) []RespErr {
+	id := r.PathValue("id")
+	if err := s.db.DelFoo(ctx, id); err != nil {
+		return []RespErr{toRespErr(err)}
+	}
+	return nil
+}
+
+func fooToData(f Foo) Data[ResourceFooAttrs] {
+	return toFooData(f.ID, ResourceFooAttrs{
+		Name:      f.Name,
+		Note:      f.Note,
+		CreatedAt: toTimestamp(f.CreatedAt),
+		UpdatedAt: toTimestamp(f.UpdatedAt),
+	})
+}
+
+func toFooData(id string, attrs ResourceFooAttrs) Data[ResourceFooAttrs] {
+	return Data[ResourceFooAttrs]{
 		Type:  resourceTypeFoo,
 		ID:    id,
 		Attrs: attrs,
@@ -195,41 +274,40 @@ func toTimestamp(t time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-func jsonIn[
-	Attr Attrs,
-	ReqBody interface {
-		Data[Attr]
-		// this is limited by go's generics in a big way, which is very unfortunate :-(
-		//	https://github.com/golang/go/issues/48522
-		getType() string
-	},
-](resource string, successCode int, fn func(context.Context, ReqBody) (Data[Attr], []RespErr)) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var (
-			reqBody ReqBody
-			errs    []RespErr
-			out     *Data[Attr]
-		)
+func jsonIn[ReqAttr, RespAttr Attrs](resource string, successCode int, fn func(context.Context, ReqBody[ReqAttr]) (*Data[RespAttr], []RespErr)) http.Handler {
+	return handler(successCode, func(ctx context.Context, r *http.Request) (*Data[RespAttr], []RespErr) {
+		var reqBody ReqBody[ReqAttr]
 		if respErr := decodeReq(r, &reqBody); respErr != nil {
-			errs = append(errs, *respErr)
+			return nil, []RespErr{*respErr}
 		}
-		if len(errs) == 0 && reqBody.getType() != resource {
-			errs = append(errs, RespErr{
+		if reqBody.Data.Type != resource {
+			return nil, []RespErr{{
 				Status: http.StatusUnprocessableEntity,
 				Code:   errTypeInvalid,
 				Msg:    "type must be " + resource,
 				Source: &RespErrSource{
 					Pointer: "/data/type",
 				},
-			})
+			}}
 		}
-		if len(errs) == 0 {
-			var data Data[Attr]
-			data, errs = fn(r.Context(), reqBody)
-			if len(errs) == 0 {
-				out = &data
-			}
-		}
+
+		return fn(r.Context(), reqBody)
+	})
+}
+
+func read[Attr any | []Attr](fn func(ctx context.Context, r *http.Request) (*Data[Attr], []RespErr)) http.Handler {
+	return handler(http.StatusOK, fn)
+}
+
+func del(fn func(ctx context.Context, r *http.Request) []RespErr) http.Handler {
+	return handler(http.StatusOK, func(ctx context.Context, r *http.Request) (*Data[any], []RespErr) {
+		return nil, fn(ctx, r)
+	})
+}
+
+func handler[Attr Attrs](successCode int, fn func(ctx context.Context, req *http.Request) (*Data[Attr], []RespErr)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out, errs := fn(r.Context(), r)
 
 		status := successCode
 		for _, e := range errs {
@@ -239,7 +317,7 @@ func jsonIn[
 		}
 
 		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(RespResourceBody[Attr]{
+		json.NewEncoder(w).Encode(RespBody[Attr]{
 			Meta: getMeta(r.Context()),
 			Errs: errs,
 			Data: out,
@@ -297,7 +375,7 @@ func WithBasicAuthV2(adminUser, adminPass string) func(*serverOpts) {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if user, pass, ok := r.BasicAuth(); !(ok && user == adminUser && pass == adminPass) {
 					w.WriteHeader(http.StatusUnauthorized) // 9)
-					json.NewEncoder(w).Encode(RespResourceBody[any]{
+					json.NewEncoder(w).Encode(RespBody[any]{
 						Meta: getMeta(r.Context()),
 						Errs: []RespErr{{
 							Status: http.StatusUnauthorized,
@@ -321,7 +399,7 @@ func contentTypeJSON(next http.Handler) http.Handler {
 		ct := r.Header.Get("Content-Type")
 		if ct != "application/json" {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
-			json.NewEncoder(w).Encode(RespResourceBody[any]{
+			json.NewEncoder(w).Encode(RespBody[any]{
 				Meta: getMeta(r.Context()),
 				Errs: []RespErr{{
 					Code: http.StatusUnsupportedMediaType,

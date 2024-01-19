@@ -143,6 +143,7 @@ type Foo struct {
 	Name      string    `json:"name" gorm:"name"`
 	Note      string    `json:"note" gorm:"note"`
 	CreatedAt time.Time `json:"-" gorm:"created_at"`
+	UpdatedAt time.Time `json:"-" gorm:"updated_at"`
 }
 
 func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
