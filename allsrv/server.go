@@ -139,11 +139,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type Foo struct {
 	// 6)
-	ID        string    `json:"id" gorm:"id"`
-	Name      string    `json:"name" gorm:"name"`
-	Note      string    `json:"note" gorm:"note"`
-	CreatedAt time.Time `json:"-" gorm:"created_at"`
-	UpdatedAt time.Time `json:"-" gorm:"updated_at"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Note      string    `json:"note"`
+	CreatedAt time.Time `json:"-"`
+	UpdatedAt time.Time `json:"-"`
 }
 
 func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
