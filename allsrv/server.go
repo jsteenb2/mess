@@ -26,7 +26,7 @@ import (
 	✅5) no tests
 		a) how do we ensure things work?
 		b) how do we know what is intended by the current implementation?
-	6) http/db are coupled to the same type
+	✅6) http/db are coupled to the same type
 		a) what happens when the concerns diverge? aka http wants a shape the db does not? (note: it happens A LOT)
 	7) Server only works with HTTP
 		a) what happens when we want to support grpc? thrift? other protocol?

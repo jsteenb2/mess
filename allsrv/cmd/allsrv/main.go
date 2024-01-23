@@ -1,15 +1,31 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/golang-migrate/migrate/v4"
+	migsqlite "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/jsteenb2/mess/allsrv"
+	"github.com/jsteenb2/mess/allsrv/migrations"
 )
 
 func main() {
-	db := new(allsrv.InmemDB)
+	var db allsrv.DB = new(allsrv.InmemDB)
+	if dsn := os.Getenv("ALLSRV_SQLITE_DSN"); dsn != "" {
+		var err error
+		db, err = newSQLiteDB(dsn)
+		if err != nil {
+			log.Println("failed to open sqlite db: " + err.Error())
+			os.Exit(1)
+		}
+	}
 
 	var svr http.Handler
 	switch os.Getenv("ALLSRV_SERVER") {
@@ -33,4 +49,38 @@ func main() {
 		log.Println(err.Error())
 		os.Exit(1)
 	}
+}
+
+func newSQLiteDB(dsn string) (allsrv.DB, error) {
+	const driver = "sqlite3"
+
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	const dbName = "testdb"
+	drvr, err := migsqlite.WithInstance(db, &migsqlite.Config{DatabaseName: dbName})
+	if err != nil {
+		return nil, err
+	}
+
+	iodrvr, err := iofs.New(migrations.SQLite, "sqlite")
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := migrate.NewWithInstance("iofs", iodrvr, dbName, drvr)
+	if err != nil {
+		return nil, err
+	}
+	err = m.Up()
+	if err != nil {
+		return nil, err
+	}
+
+	dbx := sqlx.NewDb(db, driver)
+	dbx.SetMaxIdleConns(1)
+
+	return allsrv.NewSQLiteDB(dbx), nil
 }

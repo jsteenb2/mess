@@ -16,7 +16,7 @@ func (db *InmemDB) CreateFoo(_ context.Context, f Foo) error {
 	defer db.mu.Unlock()
 
 	for _, existing := range db.m {
-		if f.Name == existing.Name {
+		if f.Name == existing.Name || f.ID == existing.ID {
 			return ExistsErr("foo "+f.Name+" exists", "name", f.Name, "existing_foo_id", existing.ID) // 8)
 		}
 	}

@@ -3,6 +3,7 @@ package allsrv_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,12 +106,10 @@ func testDBCreateFoo(t *testing.T, initFn dbInitFn) {
 					}
 				}
 
-				// execute while rest of test completes
-				for _, f := range []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")} {
-					go func(f allsrv.Foo) {
-						require.NoError(t, db.CreateFoo(context.TODO(), f))
-					}(f)
-				}
+				fixtures := []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")}
+				doConcurrent(t, fixtures, func(f allsrv.Foo) error {
+					return db.CreateFoo(context.TODO(), f)
+				})
 			},
 			inputs: inputs{
 				foo: allsrv.Foo{
@@ -153,22 +152,23 @@ func testDBCreateFoo(t *testing.T, initFn dbInitFn) {
 				require.Error(t, insertErr)
 			},
 		},
-		// {
-		// 	name:    "with foo containing ID that already exists should fail",
-		// 	prepare: prepDBFoos(allsrv.Foo{ID: "1", Name: "name-1"}),
-		// 	inputs: inputs{
-		// 		foo: allsrv.Foo{
-		// 			ID:        "1",
-		// 			Name:      "name-2",
-		// 			Note:      "some note",
-		// 			CreatedAt: start,
-		// 			UpdatedAt: start,
-		// 		},
-		// 	},
-		// 	want: func(t *testing.T, db allsrv.DB, insertErr error) {
-		// 		require.Error(t, insertErr)
-		// 	},
-		// },
+		{
+			name:    "with foo containing ID that already exists should fail",
+			prepare: createFoos(allsrv.Foo{ID: "1", Name: "name-1"}),
+			inputs: inputs{
+				foo: allsrv.Foo{
+					ID:        "1",
+					Name:      "name-2",
+					Note:      "some note",
+					CreatedAt: start,
+					UpdatedAt: start,
+				},
+			},
+			want: func(t *testing.T, db allsrv.DB, insertErr error) {
+				require.Error(t, insertErr)
+				assert.True(t, allsrv.IsExistsErr(insertErr))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -255,11 +255,10 @@ func testDBReadFoo(t *testing.T, initFn dbInitFn) {
 				}
 
 				// execute these while test is executing read
-				for _, f := range []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")} {
-					go func(f allsrv.Foo) {
-						require.NoError(t, db.UpdateFoo(context.TODO(), f))
-					}(f)
-				}
+				fixtures := []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")}
+				doConcurrent(t, fixtures, func(f allsrv.Foo) error {
+					return db.UpdateFoo(context.TODO(), f)
+				})
 			},
 			inputs: inputs{
 				id: "1",
@@ -371,11 +370,10 @@ func testDBUpdateFoo(t *testing.T, initFn dbInitFn) {
 					}
 				}
 
-				for _, f := range []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")} {
-					go func(f allsrv.Foo) {
-						require.NoError(t, db.UpdateFoo(context.TODO(), f))
-					}(f)
-				}
+				fixtures := []allsrv.Foo{newFoo("a"), newFoo("b"), newFoo("c"), newFoo("d"), newFoo("e")}
+				doConcurrent(t, fixtures, func(f allsrv.Foo) error {
+					return db.UpdateFoo(context.TODO(), f)
+				})
 			},
 			inputs: inputs{
 				foo: allsrv.Foo{
@@ -407,11 +405,7 @@ func testDBUpdateFoo(t *testing.T, initFn dbInitFn) {
 			},
 			want: func(t *testing.T, db allsrv.DB, updateErr error) {
 				require.Error(t, updateErr)
-
-				// this is pretty gross, we're matching against a raw error/text value
-				// any change in the error message means we have to update tests too
-				want := errors.New("foo not found for id: 1")
-				assert.Equal(t, want.Error(), updateErr.Error())
+				assert.True(t, allsrv.IsNotFoundErr(updateErr))
 			},
 		},
 	}
@@ -482,16 +476,15 @@ func testDBDeleteFoo(t *testing.T, initFn dbInitFn) {
 					}
 				}
 
-				for _, f := range []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")} {
+				fixtures := []allsrv.Foo{newFoo("1"), newFoo("2"), newFoo("3"), newFoo("4"), newFoo("5")}
+				for _, f := range fixtures {
 					require.NoError(t, db.CreateFoo(context.TODO(), f))
 				}
 
-				// leave the foo "1" del for the input
-				for _, id := range []string{"2", "3", "4", "5"} {
-					go func(id string) {
-						require.NoError(t, db.DelFoo(context.TODO(), id))
-					}(id)
-				}
+				fixtures = fixtures[1:]
+				doConcurrent(t, fixtures, func(f allsrv.Foo) error {
+					return db.DelFoo(context.TODO(), f.ID)
+				})
 			},
 			inputs: inputs{id: "1"},
 			want: func(t *testing.T, db allsrv.DB, delErr error) {
@@ -503,11 +496,7 @@ func testDBDeleteFoo(t *testing.T, initFn dbInitFn) {
 			inputs: inputs{id: "1"},
 			want: func(t *testing.T, db allsrv.DB, delErr error) {
 				require.Error(t, delErr)
-
-				// this is pretty gross, we're matching against a raw error/text value
-				// any change in the error message means we have to update tests too
-				want := errors.New("foo not found for id: 1")
-				assert.Equal(t, want.Error(), delErr.Error())
+				assert.True(t, allsrv.IsNotFoundErr(delErr))
 			},
 		},
 	}
@@ -526,5 +515,33 @@ func testDBDeleteFoo(t *testing.T, initFn dbInitFn) {
 			// assert
 			tt.want(t, db, delErr)
 		})
+	}
+}
+
+func doConcurrent(t *testing.T, foos []allsrv.Foo, doFn func(f allsrv.Foo) error) {
+	t.Helper()
+
+	// execute while rest of test completes
+	errStr, wg := make(chan error, len(foos)), new(sync.WaitGroup)
+	t.Cleanup(func() {
+		t.Helper()
+
+		wg.Wait()
+		close(errStr)
+
+		for err := range errStr {
+			if err == nil {
+				continue
+			}
+			assert.NoError(t, err)
+		}
+	})
+
+	for _, f := range foos {
+		wg.Add(1)
+		go func(f allsrv.Foo) {
+			defer wg.Done()
+			errStr <- doFn(f)
+		}(f)
 	}
 }

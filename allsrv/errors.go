@@ -1,5 +1,9 @@
 package allsrv
 
+import (
+	"errors"
+)
+
 const (
 	errTypeUnknown = iota
 	errTypeExists
@@ -41,7 +45,15 @@ func NotFoundErr(msg string, fields ...any) error {
 	}
 }
 
+func IsNotFoundErr(err error) bool {
+	return isErrType(err, errTypeNotFound)
+}
+
+func IsExistsErr(err error) bool {
+	return isErrType(err, errTypeExists)
+}
+
 func isErrType(err error, want int) bool {
-	e, _ := err.(Err)
-	return err != nil && e.Type == want
+	var aErr Err
+	return errors.As(err, &aErr) && aErr.Type == want
 }
