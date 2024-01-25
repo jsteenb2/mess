@@ -30,7 +30,7 @@ type dbMW struct {
 }
 
 func (d *dbMW) CreateFoo(ctx context.Context, f Foo) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_create")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "db_"+d.name+"_foo_create")
 	defer span.Finish()
 
 	rec := d.record("create")
@@ -38,7 +38,7 @@ func (d *dbMW) CreateFoo(ctx context.Context, f Foo) error {
 }
 
 func (d *dbMW) ReadFoo(ctx context.Context, id string) (Foo, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_read")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "db_"+d.name+"_foo_read")
 	defer span.Finish()
 
 	rec := d.record("read")
@@ -47,7 +47,7 @@ func (d *dbMW) ReadFoo(ctx context.Context, id string) (Foo, error) {
 }
 
 func (d *dbMW) UpdateFoo(ctx context.Context, f Foo) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_update")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "db_"+d.name+"_foo_update")
 	defer span.Finish()
 
 	rec := d.record("update")
@@ -55,7 +55,7 @@ func (d *dbMW) UpdateFoo(ctx context.Context, f Foo) error {
 }
 
 func (d *dbMW) DelFoo(ctx context.Context, id string) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, d.name+"_foo_delete")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "db_"+d.name+"_foo_delete")
 	defer span.Finish()
 
 	rec := d.record("delete")

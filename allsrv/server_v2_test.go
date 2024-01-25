@@ -26,6 +26,7 @@ func TestServerV2(t *testing.T) {
 		testCase struct {
 			name    string
 			prepare func(t *testing.T, db allsrv.DB)
+			svcOpts []func(*allsrv.Service)
 			svrOpts []allsrv.SvrOptFn
 			inputs  inputs
 			want    wantFn
@@ -41,16 +42,19 @@ func TestServerV2(t *testing.T) {
 			tt.prepare(t, db)
 		}
 
-		defaultOpts := []allsrv.SvrOptFn{
-			allsrv.WithIDFn(newIDGen(1, 1)),
-			allsrv.WithNowFn(nowFn(start, time.Hour)),
-			allsrv.WithMetrics(newTestMetrics(t)),
+		defaultSVCOpts := []func(*allsrv.Service){
+			allsrv.WithSVCIDFn(newIDGen(1, 1)),
+			allsrv.WithSVCNowFn(nowFn(start, time.Hour)),
 		}
-		opts := append(defaultOpts, tt.svrOpts...)
+		svcOpts := append(defaultSVCOpts, tt.svcOpts...)
+		svc := allsrv.NewService(db, svcOpts...)
+
+		defaultSvrOpts := []allsrv.SvrOptFn{allsrv.WithMetrics(newTestMetrics(t))}
+		svrOpts := append(defaultSvrOpts, tt.svrOpts...)
 
 		rec := httptest.NewRecorder()
 
-		svr := allsrv.NewServerV2(db, opts...)
+		svr := allsrv.NewServerV2(svc, svrOpts...)
 		svr.ServeHTTP(rec, tt.inputs.req)
 
 		tt.want(t, rec, db)
@@ -281,12 +285,10 @@ func TestServerV2(t *testing.T) {
 					Note:      "some note",
 					CreatedAt: start,
 				}),
-				svrOpts: []allsrv.SvrOptFn{
-					allsrv.WithBasicAuthV2("dodgers@stink.com", "PaSsWoRd"),
-					allsrv.WithNowFn(nowFn(start.Add(time.Hour), time.Hour)),
-				},
+				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(nowFn(start.Add(time.Hour), time.Hour))},
+				svrOpts: []allsrv.SvrOptFn{allsrv.WithBasicAuthV2("dodgers@stink.com", "PaSsWoRd")},
 				inputs: inputs{
-					req: newJSONReq("PATCH", "/v1/foos",
+					req: newJSONReq("PATCH", "/v1/foos/1",
 						newJSONBody(t, allsrv.ReqUpdateFooV1{
 							Data: allsrv.Data[allsrv.FooUpdAttrs]{
 								Type: "foo",
@@ -329,9 +331,9 @@ func TestServerV2(t *testing.T) {
 					Name:      "first-name",
 					CreatedAt: start,
 				}),
-				svrOpts: []allsrv.SvrOptFn{allsrv.WithNowFn(nowFn(start.Add(time.Hour), time.Hour))},
+				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(nowFn(start.Add(time.Hour), time.Hour))},
 				inputs: inputs{
-					req: newJSONReq("PATCH", "/v1/foos",
+					req: newJSONReq("PATCH", "/v1/foos/1",
 						newJSONBody(t, allsrv.ReqUpdateFooV1{
 							Data: allsrv.Data[allsrv.FooUpdAttrs]{
 								Type: "foo",
@@ -376,7 +378,7 @@ func TestServerV2(t *testing.T) {
 				}),
 				svrOpts: []allsrv.SvrOptFn{allsrv.WithBasicAuthV2("dodgers@stink.com", "PaSsWoRd")},
 				inputs: inputs{
-					req: newJSONReq("PATCH", "/v1/foos",
+					req: newJSONReq("PATCH", "/v1/foos/1",
 						newJSONBody(t, allsrv.ReqUpdateFooV1{
 							Data: allsrv.Data[allsrv.FooUpdAttrs]{
 								Type: "foo",
@@ -405,7 +407,7 @@ func TestServerV2(t *testing.T) {
 				name:    "when updating foo too a name that collides with existing should fail",
 				prepare: createFoos(allsrv.Foo{ID: "1", Name: "start-foo"}, allsrv.Foo{ID: "9000", Name: "existing-foo"}),
 				inputs: inputs{
-					req: newJSONReq("PATCH", "/v1/foos", newJSONBody(t, allsrv.ReqUpdateFooV1{
+					req: newJSONReq("PATCH", "/v1/foos/1", newJSONBody(t, allsrv.ReqUpdateFooV1{
 						Data: allsrv.Data[allsrv.FooUpdAttrs]{
 							Type: "foo",
 							ID:   "1",

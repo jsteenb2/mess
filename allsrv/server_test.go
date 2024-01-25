@@ -29,7 +29,7 @@ func TestServer(t *testing.T) {
 			)
 			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
-			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
+			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.FooV0{
 				Name: "first-foo",
 				Note: "some note",
 			}))
@@ -39,8 +39,8 @@ func TestServer(t *testing.T) {
 			svr.ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusCreated, rec.Code)
-			expectJSONBody(t, rec.Body, func(t *testing.T, got allsrv.Foo) {
-				want := allsrv.Foo{
+			expectJSONBody(t, rec.Body, func(t *testing.T, got allsrv.FooV0) {
+				want := allsrv.FooV0{
 					ID:   "id1",
 					Name: "first-foo",
 					Note: "some note",
@@ -52,7 +52,7 @@ func TestServer(t *testing.T) {
 		t.Run("when provided invalid basic auth should fail", func(t *testing.T) {
 			svr := allsrv.NewServer(new(allsrv.InmemDB), allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
-			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.Foo{
+			req := httptest.NewRequest("POST", "/foo", newJSONBody(t, allsrv.FooV0{
 				Name: "first-foo",
 				Note: "some note",
 			}))
@@ -86,8 +86,8 @@ func TestServer(t *testing.T) {
 			svr.ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusOK, rec.Code)
-			expectJSONBody(t, rec.Body, func(t *testing.T, got allsrv.Foo) {
-				want := allsrv.Foo{
+			expectJSONBody(t, rec.Body, func(t *testing.T, got allsrv.FooV0) {
+				want := allsrv.FooV0{
 					ID:   "reader1",
 					Name: "read",
 					Note: "another note",
@@ -123,7 +123,7 @@ func TestServer(t *testing.T) {
 			var svr http.Handler = allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 			svr = allsrv.ObserveHandler("allsrv", met)(svr)
 
-			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
+			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.FooV0{
 				ID:   "id1",
 				Name: "second_name",
 				Note: "second note",
@@ -148,7 +148,7 @@ func TestServer(t *testing.T) {
 
 			svr := allsrv.NewServer(db, allsrv.WithBasicAuth("dodgers@stink.com", "PaSsWoRd"))
 
-			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.Foo{
+			req := httptest.NewRequest("PUT", "/foo", newJSONBody(t, allsrv.FooV0{
 				ID:   "id1",
 				Name: "second_name",
 				Note: "second note",

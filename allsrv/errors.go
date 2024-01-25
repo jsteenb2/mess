@@ -45,6 +45,12 @@ func NotFoundErr(msg string, fields ...any) error {
 	}
 }
 
+func errFields(err error) []any {
+	var aErr Err
+	errors.As(err, &aErr)
+	return aErr.Fields
+}
+
 func IsNotFoundErr(err error) bool {
 	return isErrType(err, errTypeNotFound)
 }

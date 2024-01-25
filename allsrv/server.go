@@ -1,7 +1,6 @@
 package allsrv
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -28,16 +27,16 @@ import (
 		b) how do we know what is intended by the current implementation?
 	✅6) http/db are coupled to the same type
 		a) what happens when the concerns diverge? aka http wants a shape the db does not? (note: it happens A LOT)
-	7) Server only works with HTTP
+	✅7) Server only works with HTTP
 		a) what happens when we want to support grpc? thrift? other protocol?
 		b) this setup often leads to copy pasta/weak abstractions that tend to leak
 	✅8) Errors are opaque and limited
-	9) API is very bare bones
+	✅9) API is very bare bones
 		a) there is nothing actionable, so how does the consumer know to handle the error?
 		b) if the APIs evolve, how does the consumer distinguish between old and new?
-	10) Observability....
+	✅10) Observability....
 		✅a) metrics
-		b) logging
+		✅b) logging
 		✅c) tracing
 	✅11) hard coding UUID generation into db
 	✅12) possible race conditions in inmem store
@@ -49,17 +48,6 @@ import (
 	3) minimal indirection/obvious code
 	4) is trivial in scope
 */
-
-// Server dependencies
-type (
-	// DB represents the foo persistence layer.
-	DB interface {
-		CreateFoo(ctx context.Context, f Foo) error
-		ReadFoo(ctx context.Context, id string) (Foo, error)
-		UpdateFoo(ctx context.Context, f Foo) error
-		DelFoo(ctx context.Context, id string) error
-	}
-)
 
 type serverOpts struct {
 	authFn func(http.Handler) http.Handler
@@ -137,31 +125,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-type Foo struct {
-	// 6)
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Note      string    `json:"note"`
-	CreatedAt time.Time `json:"-"`
-	UpdatedAt time.Time `json:"-"`
+// FooV0 is the API response for the legacy API.
+type FooV0 struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Note string `json:"note"`
 }
 
 func (s *Server) createFoo(w http.ResponseWriter, r *http.Request) {
-	var f Foo
+	var f FooV0
 	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
 		w.WriteHeader(http.StatusForbidden) // 9)
 		return
 	}
 
-	f.ID = s.idFn() // 11)
-
-	if err := s.db.CreateFoo(r.Context(), f); err != nil {
+	newFoo := Foo{
+		ID:   s.idFn(), // 11)
+		Name: f.Name,
+		Note: f.Note,
+	}
+	if err := s.db.CreateFoo(r.Context(), newFoo); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(f); err != nil {
+	if err := json.NewEncoder(w).Encode(newFoo); err != nil {
 		log.Printf("unexpected error writing json value to response body: " + err.Error()) // 8) 10)
 	}
 }
@@ -173,19 +162,29 @@ func (s *Server) readFoo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(f); err != nil {
+	out := FooV0{
+		ID:   f.ID,
+		Name: f.Name,
+		Note: f.Note,
+	}
+	if err := json.NewEncoder(w).Encode(out); err != nil {
 		log.Printf("unexpected error writing json value to response body: " + err.Error()) // 8) 10)
 	}
 }
 
 func (s *Server) updateFoo(w http.ResponseWriter, r *http.Request) {
-	var f Foo
+	var f FooV0
 	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
 		w.WriteHeader(http.StatusForbidden) // 9)
 		return
 	}
 
-	if err := s.db.UpdateFoo(r.Context(), f); err != nil {
+	updateFoo := Foo{
+		ID:   f.ID,
+		Name: f.Name,
+		Note: f.Note,
+	}
+	if err := s.db.UpdateFoo(r.Context(), updateFoo); err != nil {
 		w.WriteHeader(http.StatusInternalServerError) // 9)
 		return
 	}

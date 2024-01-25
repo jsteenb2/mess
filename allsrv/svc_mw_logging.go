@@ -1,0 +1,96 @@
+package allsrv
+
+import (
+	"context"
+	"log/slog"
+	"time"
+)
+
+// SVCLogging wraps the service with logging concerns.
+func SVCLogging(logger *slog.Logger) func(SVC) SVC {
+	return func(next SVC) SVC {
+		return &svcMWLogger{
+			logger: logger,
+			next:   next,
+		}
+	}
+}
+
+type svcMWLogger struct {
+	logger *slog.Logger
+	next   SVC
+}
+
+func (s *svcMWLogger) CreateFoo(ctx context.Context, f Foo) (Foo, error) {
+	logFn := s.logFn("input_name", f.Name, "input_note", f.Note)
+
+	f, err := s.next.CreateFoo(ctx, f)
+	logger := logFn(err)
+	if err != nil {
+		logger.Error("failed to create foo")
+	} else {
+		logger.Info("foo created successfully", "new_foo_id", f.ID)
+	}
+
+	return f, err
+}
+
+func (s *svcMWLogger) ReadFoo(ctx context.Context, id string) (Foo, error) {
+	logFn := s.logFn("input_id", id)
+
+	f, err := s.next.ReadFoo(ctx, id)
+	logger := logFn(err)
+	if err != nil {
+		logger.Error("failed to read foo")
+	}
+
+	return f, err
+}
+
+func (s *svcMWLogger) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
+	fields := []any{"input_id", f.ID}
+	if f.Name != nil {
+		fields = append(fields, "input_name", *f.Name)
+	}
+	if f.Note != nil {
+		fields = append(fields, "input_note", *f.Note)
+	}
+
+	logFn := s.logFn(fields...)
+
+	updatedFoo, err := s.next.UpdateFoo(ctx, f)
+	logger := logFn(err)
+	if err != nil {
+		logger.Error("failed to update foo")
+	} else {
+		logger.Info("foo updated successfully")
+	}
+
+	return updatedFoo, err
+}
+
+func (s *svcMWLogger) DelFoo(ctx context.Context, id string) error {
+	logFn := s.logFn("input_id", id)
+
+	err := s.next.DelFoo(ctx, id)
+	logger := logFn(err)
+	if err != nil {
+		logger.Error("failed to delete foo")
+	} else {
+		logger.Info("foo deleted successfully")
+	}
+
+	return err
+}
+
+func (s *svcMWLogger) logFn(fields ...any) func(error) *slog.Logger {
+	start := time.Now()
+	return func(err error) *slog.Logger {
+		fields = append(fields, "took_ms", time.Since(start).Round(time.Millisecond).String())
+		if err != nil {
+			fields = append(fields, errFields(err)...)
+			fields = append(fields, "err", err.Error())
+		}
+		return s.logger.With(fields...)
+	}
+}

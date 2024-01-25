@@ -1,14 +1,19 @@
 package main
 
 import (
+	"cmp"
 	"database/sql"
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	migsqlite "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/hashicorp/go-metrics"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 
@@ -17,36 +22,46 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
+
 	var db allsrv.DB = new(allsrv.InmemDB)
 	if dsn := os.Getenv("ALLSRV_SQLITE_DSN"); dsn != "" {
 		var err error
 		db, err = newSQLiteDB(dsn)
 		if err != nil {
-			log.Println("failed to open sqlite db: " + err.Error())
+			logger.Error("failed to open sqlite db", "err", err.Error())
 			os.Exit(1)
 		}
+		logger.Info("sqlite database opened", "dsn", dsn)
 	}
 
-	var svr http.Handler
-	switch os.Getenv("ALLSRV_SERVER") {
-	case "v1":
-		log.Println("starting v1 server")
-		svr = allsrv.NewServer(db, allsrv.WithBasicAuth("admin", "pass"))
-	case "v2":
-		log.Println("starting v2 server")
-		svr = allsrv.NewServerV2(db, allsrv.WithBasicAuthV2("admin", "pass"))
-	default: // run both
-		log.Println("starting combination v1/v2 server")
-		mux := http.NewServeMux()
-		allsrv.NewServer(db, allsrv.WithMux(mux), allsrv.WithBasicAuth("admin", "pass"))
-		allsrv.NewServerV2(db, allsrv.WithMux(mux), allsrv.WithBasicAuthV2("admin", "pass"))
-		svr = mux
+	mux := http.NewServeMux()
+
+	selectedSVR := strings.TrimSpace(strings.ToLower(os.Getenv("ALLSRV_SERVER")))
+	if selectedSVR != "v2" {
+		logger.Info("registering v1 server")
+		allsrv.NewServer(db, allsrv.WithBasicAuth("admin", "pass"), allsrv.WithMux(mux))
+	}
+	if selectedSVR != "v1" {
+		logger.Info("registering v2 server")
+
+		var svc allsrv.SVC = allsrv.NewService(db)
+		svc = allsrv.SVCLogging(logger)(svc)
+
+		met, err := metrics.New(metrics.DefaultConfig("allsrv"), metrics.NewInmemSink(5*time.Second, time.Minute))
+		if err != nil {
+			logger.Error("failed to create metrics", "err", err.Error())
+			os.Exit(1)
+		}
+		svc = allsrv.ObserveSVC(met)(svc)
+
+		allsrv.NewServerV2(svc, allsrv.WithBasicAuthV2("admin", "pass"), allsrv.WithMux(mux))
 	}
 
-	port := ":8091"
-	log.Println("listening at http://localhost" + port)
-	if err := http.ListenAndServe(port, svr); err != nil && err != http.ErrServerClosed {
-		log.Println(err.Error())
+	addr := "localhost:" + strings.TrimPrefix(cmp.Or(os.Getenv("ALLSRV_PORT"), "8091"), ":")
+	logger.Info("listening at " + addr)
+	if err := http.ListenAndServe(addr, mux); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Error("shut down error encountered", "err", err.Error(), "addr", addr)
 		os.Exit(1)
 	}
 }
