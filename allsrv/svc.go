@@ -7,22 +7,29 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// Foo domain types.
-type (
-	Foo struct {
-		ID        string
-		Name      string
-		Note      string
-		CreatedAt time.Time
-		UpdatedAt time.Time
-	}
+// Foo represents the foo domain entity.
+type Foo struct {
+	ID        string
+	Name      string
+	Note      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
 
-	FooUpd struct {
-		ID   string
-		Name *string
-		Note *string
+// OK validates the fields are provided.
+func (f Foo) OK() error {
+	if f.Name == "" {
+		return InvalidErr("name is required")
 	}
-)
+	return nil
+}
+
+// FooUpd is a record for updating an existing foo.
+type FooUpd struct {
+	ID   string
+	Name *string
+	Note *string
+}
 
 // SVC defines the service behavior.
 type SVC interface {
@@ -78,6 +85,10 @@ func NewService(db DB, opts ...func(*Service)) *Service {
 }
 
 func (s *Service) CreateFoo(ctx context.Context, f Foo) (Foo, error) {
+	if err := f.OK(); err != nil {
+		return Foo{}, err
+	}
+
 	now := s.nowFn()
 	f.ID, f.CreatedAt, f.UpdatedAt = s.idFn(), now, now
 

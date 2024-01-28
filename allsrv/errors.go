@@ -13,8 +13,17 @@ const (
 	errTypeInternal
 )
 
+var errTypeStrs = [...]string{
+	errTypeUnknown:  "unknown",
+	errTypeExists:   "exists",
+	errTypeInvalid:  "invalid",
+	errTypeUnAuthed: "unauthed",
+	errTypeNotFound: "not found",
+	errTypeInternal: "internal",
+}
+
 // Err provides a lightly structured error that we can attach behavior. Additionally,
-// the use of fields makes it possible for us to enrich our logging infra without
+// the use of options makes it possible for us to enrich our logging infra without
 // blowing up the message cardinality.
 type Err struct {
 	Type   int
@@ -36,6 +45,14 @@ func ExistsErr(msg string, fields ...any) error {
 	}
 }
 
+func InvalidErr(msg string, fields ...any) error {
+	return Err{
+		Type:   errTypeInvalid,
+		Msg:    msg,
+		Fields: fields,
+	}
+}
+
 // NotFoundErr creates a not found error.
 func NotFoundErr(msg string, fields ...any) error {
 	return Err{
@@ -48,15 +65,19 @@ func NotFoundErr(msg string, fields ...any) error {
 func errFields(err error) []any {
 	var aErr Err
 	errors.As(err, &aErr)
-	return aErr.Fields
-}
-
-func IsNotFoundErr(err error) bool {
-	return isErrType(err, errTypeNotFound)
+	return append(aErr.Fields, "err_type", errTypeStrs[aErr.Type])
 }
 
 func IsExistsErr(err error) bool {
 	return isErrType(err, errTypeExists)
+}
+
+func IsInvalidErr(err error) bool {
+	return isErrType(err, errTypeInvalid)
+}
+
+func IsNotFoundErr(err error) bool {
+	return isErrType(err, errTypeNotFound)
 }
 
 func isErrType(err error, want int) bool {

@@ -42,11 +42,7 @@ func TestServerV2(t *testing.T) {
 			tt.prepare(t, db)
 		}
 
-		defaultSVCOpts := []func(*allsrv.Service){
-			allsrv.WithSVCIDFn(newIDGen(1, 1)),
-			allsrv.WithSVCNowFn(nowFn(start, time.Hour)),
-		}
-		svcOpts := append(defaultSVCOpts, tt.svcOpts...)
+		svcOpts := append(defaultSVCOpts(start), tt.svcOpts...)
 		svc := allsrv.NewService(db, svcOpts...)
 
 		defaultSvrOpts := []allsrv.SvrOptFn{allsrv.WithMetrics(newTestMetrics(t))}

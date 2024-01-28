@@ -86,11 +86,13 @@ func (s *svcMWLogger) DelFoo(ctx context.Context, id string) error {
 func (s *svcMWLogger) logFn(fields ...any) func(error) *slog.Logger {
 	start := time.Now()
 	return func(err error) *slog.Logger {
-		fields = append(fields, "took_ms", time.Since(start).Round(time.Millisecond).String())
+		logger := s.logger.
+			With(fields...).
+			With("took_ms", time.Since(start).Round(time.Millisecond).String())
 		if err != nil {
-			fields = append(fields, errFields(err)...)
-			fields = append(fields, "err", err.Error())
+			logger = logger.With("err", err.Error())
+			logger = logger.WithGroup("err_fields").With(errFields(err)...)
 		}
-		return s.logger.With(fields...)
+		return logger
 	}
 }
