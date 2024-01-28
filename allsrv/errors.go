@@ -22,6 +22,10 @@ var errTypeStrs = [...]string{
 	errTypeInternal: "internal",
 }
 
+var (
+	errIDRequired = InvalidErr("id is requierd")
+)
+
 // Err provides a lightly structured error that we can attach behavior. Additionally,
 // the use of options makes it possible for us to enrich our logging infra without
 // blowing up the message cardinality.
@@ -48,6 +52,14 @@ func ExistsErr(msg string, fields ...any) error {
 func InvalidErr(msg string, fields ...any) error {
 	return Err{
 		Type:   errTypeInvalid,
+		Msg:    msg,
+		Fields: fields,
+	}
+}
+
+func InternalErr(msg string, fields ...any) error {
+	return Err{
+		Type:   errTypeInternal,
 		Msg:    msg,
 		Fields: fields,
 	}

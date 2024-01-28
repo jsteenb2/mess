@@ -288,7 +288,7 @@ func handler[Attr Attrs](successCode int, fn func(ctx context.Context, req *http
 				status = e.Status
 			}
 		}
-
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(RespBody[Attr]{
 			Meta: getMeta(r.Context()),

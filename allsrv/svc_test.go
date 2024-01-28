@@ -9,14 +9,18 @@ import (
 )
 
 func TestService(t *testing.T) {
-	testSVC(t, func(t *testing.T, fields svcTestOpts) svcDeps {
-		db := new(allsrv.InmemDB)
-		fields.prepDB(t, db)
-
-		var svc allsrv.SVC = allsrv.NewService(db, fields.svcOpts...)
-		svc = allsrv.SVCLogging(newTestLogger(t))(svc)
-		svc = allsrv.ObserveSVC(metrics.Default())(svc)
-
-		return svcDeps{svc: svc}
+	testSVC(t, func(t *testing.T, opts svcTestOpts) svcDeps {
+		return svcDeps{svc: newInmemSVC(t, opts)}
 	})
+}
+
+func newInmemSVC(t *testing.T, opts svcTestOpts) allsrv.SVC {
+	db := new(allsrv.InmemDB)
+	opts.prepDB(t, db)
+
+	var svc allsrv.SVC = allsrv.NewService(db, opts.svcOpts...)
+	svc = allsrv.SVCLogging(newTestLogger(t))(svc)
+	svc = allsrv.ObserveSVC(metrics.Default())(svc)
+
+	return svc
 }

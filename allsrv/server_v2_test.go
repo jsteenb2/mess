@@ -15,6 +15,18 @@ import (
 	"github.com/jsteenb2/mess/allsrv"
 )
 
+func TestServerV2HttpClient(t *testing.T) {
+	testSVC(t, func(t *testing.T, opts svcTestOpts) svcDeps {
+		svc := newInmemSVC(t, opts)
+		srv := httptest.NewServer(allsrv.NewServerV2(svc))
+		t.Cleanup(srv.Close)
+
+		return svcDeps{
+			svc: allsrv.NewClientHTTP(srv.URL, &http.Client{Timeout: time.Second}),
+		}
+	})
+}
+
 func TestServerV2(t *testing.T) {
 	type (
 		inputs struct {

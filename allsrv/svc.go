@@ -100,6 +100,9 @@ func (s *Service) CreateFoo(ctx context.Context, f Foo) (Foo, error) {
 }
 
 func (s *Service) ReadFoo(ctx context.Context, id string) (Foo, error) {
+	if id == "" {
+		return Foo{}, errIDRequired
+	}
 	return s.db.ReadFoo(ctx, id)
 }
 
@@ -125,5 +128,8 @@ func (s *Service) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
 }
 
 func (s *Service) DelFoo(ctx context.Context, id string) error {
+	if id == "" {
+		return errIDRequired
+	}
 	return s.db.DelFoo(ctx, id)
 }

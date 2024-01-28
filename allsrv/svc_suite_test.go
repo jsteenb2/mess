@@ -15,7 +15,7 @@ import (
 var start = time.Time{}.Add(time.Hour).UTC()
 
 type (
-	svcInitFn func(t *testing.T, options svcTestOpts) svcDeps
+	svcInitFn func(t *testing.T, opts svcTestOpts) svcDeps
 
 	svcDeps struct {
 		svc allsrv.SVC
@@ -194,6 +194,16 @@ func testSVCRead(t *testing.T, initFn svcInitFn) {
 			},
 			want: func(t *testing.T, got allsrv.Foo, readErr error) {
 				wantFoo(fooTwo)
+			},
+		},
+		{
+			name: "with an empty string id should fail",
+			input: inputs{
+				id: "",
+			},
+			want: func(t *testing.T, got allsrv.Foo, readErr error) {
+				require.Error(t, readErr)
+				assert.True(t, allsrv.IsInvalidErr(readErr), "got_err="+readErr.Error())
 			},
 		},
 		{
@@ -403,6 +413,16 @@ func testSVCDel(t *testing.T, initFn svcInitFn) {
 			want: func(t *testing.T, svc allsrv.SVC, delErr error) {
 				require.Error(t, delErr)
 				assert.True(t, allsrv.IsNotFoundErr(delErr))
+			},
+		},
+		{
+			name: "without id should fail",
+			input: inputs{
+				id: "",
+			},
+			want: func(t *testing.T, svc allsrv.SVC, delErr error) {
+				require.Error(t, delErr)
+				assert.True(t, allsrv.IsInvalidErr(delErr), "got_err="+delErr.Error())
 			},
 		},
 	}
