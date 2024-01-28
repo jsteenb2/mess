@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
@@ -13,16 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jsteenb2/mess/allsrv"
+	"github.com/jsteenb2/mess/allsrv/allsrvtesting"
 )
 
 func TestServerV2HttpClient(t *testing.T) {
-	testSVC(t, func(t *testing.T, opts svcTestOpts) svcDeps {
-		svc := newInmemSVC(t, opts)
+	allsrvtesting.TestSVC(t, func(t *testing.T, opts allsrvtesting.SVCTestOpts) allsrvtesting.SVCDeps {
+		svc := allsrvtesting.NewInmemSVC(t, opts)
 		srv := httptest.NewServer(allsrv.NewServerV2(svc))
 		t.Cleanup(srv.Close)
 
-		return svcDeps{
-			svc: allsrv.NewClientHTTP(srv.URL, &http.Client{Timeout: time.Second}),
+		return allsrvtesting.SVCDeps{
+			SVC: allsrv.NewClientHTTP(srv.URL, &http.Client{Timeout: time.Second}),
 		}
 	})
 }
@@ -54,7 +54,7 @@ func TestServerV2(t *testing.T) {
 			tt.prepare(t, db)
 		}
 
-		svcOpts := append(defaultSVCOpts(start), tt.svcOpts...)
+		svcOpts := append(allsrvtesting.DefaultSVCOpts(start), tt.svcOpts...)
 		svc := allsrv.NewService(db, svcOpts...)
 
 		defaultSvrOpts := []allsrv.SvrOptFn{allsrv.WithMetrics(newTestMetrics(t))}
@@ -143,7 +143,7 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name:    "when creating foo with name that collides with existing should fail",
-				prepare: createFoos(allsrv.Foo{ID: "9000", Name: "existing-foo"}),
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{ID: "9000", Name: "existing-foo"}),
 				inputs: inputs{
 					req: newJSONReq("POST", "/v1/foos", newJSONBody(t, allsrv.ReqCreateFooV1{
 						Data: allsrv.Data[allsrv.FooCreateAttrs]{
@@ -211,7 +211,7 @@ func TestServerV2(t *testing.T) {
 		tests := []testCase{
 			{
 				name: "with authorized user for existing foo should pass",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
@@ -238,7 +238,7 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name: "with unauthorized user for existing foo should fail",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
@@ -287,13 +287,13 @@ func TestServerV2(t *testing.T) {
 		tests := []testCase{
 			{
 				name: "when provided a full valid update and authorized user should pass",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
 					CreatedAt: start,
 				}),
-				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(nowFn(start.Add(time.Hour), time.Hour))},
+				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(allsrvtesting.NowFn(start.Add(time.Hour), time.Hour))},
 				svrOpts: []allsrv.SvrOptFn{allsrv.WithBasicAuthV2("dodgers@stink.com", "PaSsWoRd")},
 				inputs: inputs{
 					req: newJSONReq("PATCH", "/v1/foos/1",
@@ -302,8 +302,8 @@ func TestServerV2(t *testing.T) {
 								Type: "foo",
 								ID:   "1",
 								Attrs: allsrv.FooUpdAttrs{
-									Name: ptr("new-name"),
-									Note: ptr("new note"),
+									Name: allsrvtesting.Ptr("new-name"),
+									Note: allsrvtesting.Ptr("new note"),
 								},
 							},
 						}),
@@ -334,12 +334,12 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name: "when provided a name only update should pass",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-name",
 					CreatedAt: start,
 				}),
-				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(nowFn(start.Add(time.Hour), time.Hour))},
+				svcOpts: []func(*allsrv.Service){allsrv.WithSVCNowFn(allsrvtesting.NowFn(start.Add(time.Hour), time.Hour))},
 				inputs: inputs{
 					req: newJSONReq("PATCH", "/v1/foos/1",
 						newJSONBody(t, allsrv.ReqUpdateFooV1{
@@ -347,7 +347,7 @@ func TestServerV2(t *testing.T) {
 								Type: "foo",
 								ID:   "1",
 								Attrs: allsrv.FooUpdAttrs{
-									Note: ptr("new note"),
+									Note: allsrvtesting.Ptr("new note"),
 								},
 							},
 						}),
@@ -378,7 +378,7 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name: "when missing required auth should fail",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
@@ -392,7 +392,7 @@ func TestServerV2(t *testing.T) {
 								Type: "foo",
 								ID:   "1",
 								Attrs: allsrv.FooUpdAttrs{
-									Note: ptr("new note"),
+									Note: allsrvtesting.Ptr("new note"),
 								},
 							},
 						}),
@@ -413,15 +413,15 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name:    "when updating foo too a name that collides with existing should fail",
-				prepare: createFoos(allsrv.Foo{ID: "1", Name: "start-foo"}, allsrv.Foo{ID: "9000", Name: "existing-foo"}),
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{ID: "1", Name: "start-foo"}, allsrv.Foo{ID: "9000", Name: "existing-foo"}),
 				inputs: inputs{
 					req: newJSONReq("PATCH", "/v1/foos/1", newJSONBody(t, allsrv.ReqUpdateFooV1{
 						Data: allsrv.Data[allsrv.FooUpdAttrs]{
 							Type: "foo",
 							ID:   "1",
 							Attrs: allsrv.FooUpdAttrs{
-								Name: ptr("existing-foo"),
-								Note: ptr("some note"),
+								Name: allsrvtesting.Ptr("existing-foo"),
+								Note: allsrvtesting.Ptr("some note"),
 							},
 						},
 					})),
@@ -456,7 +456,7 @@ func TestServerV2(t *testing.T) {
 		tests := []testCase{
 			{
 				name: "with authorized user for existing foo should pass",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
@@ -480,7 +480,7 @@ func TestServerV2(t *testing.T) {
 			},
 			{
 				name: "with unauthorized user for existing foo should fail",
-				prepare: createFoos(allsrv.Foo{
+				prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first-foo",
 					Note:      "some note",
@@ -561,17 +561,6 @@ func dbHasFoo(t *testing.T, db allsrv.DB, want allsrv.Foo) {
 	assert.Equal(t, want, got)
 }
 
-func createFoos(foos ...allsrv.Foo) func(t *testing.T, db allsrv.DB) {
-	return func(t *testing.T, db allsrv.DB) {
-		t.Helper()
-
-		for _, f := range foos {
-			err := db.CreateFoo(context.TODO(), f)
-			require.NoError(t, err)
-		}
-	}
-}
-
 func newJSONReq(method, target string, body io.Reader, opts ...func(*http.Request)) *http.Request {
 	opts = append([]func(*http.Request){withContentType("application/json")}, opts...)
 	return newReq(method, target, body, opts...)
@@ -603,24 +592,4 @@ func withBasicAuth(user, pass string) func(*http.Request) {
 	return func(req *http.Request) {
 		req.SetBasicAuth(user, pass)
 	}
-}
-
-func newIDGen(start, incr int) func() string {
-	return func() string {
-		id := strconv.Itoa(start)
-		start += incr
-		return id
-	}
-}
-
-func nowFn(start time.Time, incr time.Duration) func() time.Time {
-	return func() time.Time {
-		t := start
-		start = start.Add(incr)
-		return t
-	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

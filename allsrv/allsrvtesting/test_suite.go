@@ -1,8 +1,7 @@
-package allsrv_test
+package allsrvtesting
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -15,22 +14,22 @@ import (
 var start = time.Time{}.Add(time.Hour).UTC()
 
 type (
-	svcInitFn func(t *testing.T, opts svcTestOpts) svcDeps
+	SVCInitFn func(t *testing.T, opts SVCTestOpts) SVCDeps
 
-	svcDeps struct {
-		svc allsrv.SVC
+	SVCDeps struct {
+		SVC allsrv.SVC
 	}
 
-	svcTestOpts struct {
-		prepDB  func(t *testing.T, db allsrv.DB)
-		svcOpts []func(svc *allsrv.Service)
+	SVCTestOpts struct {
+		PrepDB  func(t *testing.T, db allsrv.DB)
+		SVCOpts []func(svc *allsrv.Service)
 	}
 )
 
-func testSVC(t *testing.T, initFn svcInitFn) {
+func TestSVC(t *testing.T, initFn SVCInitFn) {
 	tests := []struct {
 		name   string
-		testFn func(t *testing.T, initFn svcInitFn)
+		testFn func(t *testing.T, initFn SVCInitFn)
 	}{
 		{name: "Create", testFn: testSVCCreate},
 		{name: "Read", testFn: testSVCRead},
@@ -44,7 +43,7 @@ func testSVC(t *testing.T, initFn svcInitFn) {
 	}
 }
 
-func testSVCCreate(t *testing.T, initFn svcInitFn) {
+func testSVCCreate(t *testing.T, initFn SVCInitFn) {
 	type (
 		inputs struct {
 			foo allsrv.Foo
@@ -55,7 +54,7 @@ func testSVCCreate(t *testing.T, initFn svcInitFn) {
 
 	tests := []struct {
 		name  string
-		opts  svcTestOpts
+		opts  SVCTestOpts
 		input inputs
 		want  wantFn
 	}{
@@ -97,8 +96,8 @@ func testSVCCreate(t *testing.T, initFn svcInitFn) {
 		},
 		{
 			name: "with foo with conflicting name should fail",
-			opts: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{ID: "9000", Name: "existing-foo"}),
+			opts: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{ID: "9000", Name: "existing-foo"}),
 			},
 			input: inputs{
 				foo: allsrv.Foo{
@@ -131,7 +130,7 @@ func testSVCCreate(t *testing.T, initFn svcInitFn) {
 			deps := initFn(t, withTestOptions(tt.opts))
 
 			// action
-			got, err := deps.svc.CreateFoo(context.TODO(), tt.input.foo)
+			got, err := deps.SVC.CreateFoo(context.TODO(), tt.input.foo)
 
 			// assert
 			tt.want(t, got, err)
@@ -139,7 +138,7 @@ func testSVCCreate(t *testing.T, initFn svcInitFn) {
 	}
 }
 
-func testSVCRead(t *testing.T, initFn svcInitFn) {
+func testSVCRead(t *testing.T, initFn SVCInitFn) {
 	type (
 		inputs struct {
 			id string
@@ -168,14 +167,14 @@ func testSVCRead(t *testing.T, initFn svcInitFn) {
 
 	tests := []struct {
 		name    string
-		options svcTestOpts
+		options SVCTestOpts
 		input   inputs
 		want    wantFn
 	}{
 		{
 			name: "with existing id should pass",
-			options: svcTestOpts{
-				prepDB: createFoos(ninekFoo, fooTwo),
+			options: SVCTestOpts{
+				PrepDB: CreateFoos(ninekFoo, fooTwo),
 			},
 			input: inputs{
 				id: ninekFoo.ID,
@@ -186,8 +185,8 @@ func testSVCRead(t *testing.T, initFn svcInitFn) {
 		},
 		{
 			name: "with another existing id should pass",
-			options: svcTestOpts{
-				prepDB: createFoos(ninekFoo, fooTwo),
+			options: SVCTestOpts{
+				PrepDB: CreateFoos(ninekFoo, fooTwo),
 			},
 			input: inputs{
 				id: fooTwo.ID,
@@ -224,7 +223,7 @@ func testSVCRead(t *testing.T, initFn svcInitFn) {
 			deps := initFn(t, withTestOptions(tt.options))
 
 			// action
-			got, err := deps.svc.ReadFoo(context.TODO(), tt.input.id)
+			got, err := deps.SVC.ReadFoo(context.TODO(), tt.input.id)
 
 			// assert
 			tt.want(t, got, err)
@@ -232,7 +231,7 @@ func testSVCRead(t *testing.T, initFn svcInitFn) {
 	}
 }
 
-func testSVCUpdate(t *testing.T, initFn svcInitFn) {
+func testSVCUpdate(t *testing.T, initFn SVCInitFn) {
 	type (
 		inputs struct {
 			upd allsrv.FooUpd
@@ -243,14 +242,14 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 
 	tests := []struct {
 		name  string
-		opts  svcTestOpts
+		opts  SVCTestOpts
 		input inputs
 		want  wantFn
 	}{
 		{
 			name: "with valid full update of existing foo should pass",
-			opts: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{
+			opts: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first_foo",
 					Note:      "first note",
@@ -261,8 +260,8 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 			input: inputs{
 				upd: allsrv.FooUpd{
 					ID:   "1",
-					Name: ptr("updated_foo"),
-					Note: ptr("updated note"),
+					Name: Ptr("updated_foo"),
+					Note: Ptr("updated note"),
 				},
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
@@ -277,8 +276,8 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 		},
 		{
 			name: "with valid name only update of existing foo should pass",
-			opts: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{
+			opts: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first_foo",
 					Note:      "first note",
@@ -289,7 +288,7 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 			input: inputs{
 				upd: allsrv.FooUpd{
 					ID:   "1",
-					Name: ptr("updated_foo"),
+					Name: Ptr("updated_foo"),
 				},
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
@@ -304,8 +303,8 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 		},
 		{
 			name: "with valid note only update of existing foo should pass",
-			opts: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{
+			opts: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{
 					ID:        "1",
 					Name:      "first_foo",
 					Note:      "first note",
@@ -316,7 +315,7 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 			input: inputs{
 				upd: allsrv.FooUpd{
 					ID:   "1",
-					Note: ptr("updated note"),
+					Note: Ptr("updated note"),
 				},
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
@@ -334,7 +333,7 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 			input: inputs{
 				upd: allsrv.FooUpd{
 					ID:   "1",
-					Note: ptr("updated note"),
+					Note: Ptr("updated note"),
 				},
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
@@ -344,14 +343,14 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 		},
 		{
 			name: "when updating foo too a name that collides with existing should fail",
-			opts: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{ID: "1", Name: "start-foo"}, allsrv.Foo{ID: "9000", Name: "existing-foo"}),
+			opts: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{ID: "1", Name: "start-foo"}, allsrv.Foo{ID: "9000", Name: "existing-foo"}),
 			},
 			input: inputs{
 				upd: allsrv.FooUpd{
 					ID:   "1",
-					Name: ptr("existing-foo"),
-					Note: ptr("some note"),
+					Name: Ptr("existing-foo"),
+					Note: Ptr("some note"),
 				},
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
@@ -366,7 +365,7 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 			deps := initFn(t, withTestOptions(tt.opts))
 
 			// action
-			got, err := deps.svc.UpdateFoo(context.TODO(), tt.input.upd)
+			got, err := deps.SVC.UpdateFoo(context.TODO(), tt.input.upd)
 
 			// assert
 			tt.want(t, got, err)
@@ -374,7 +373,7 @@ func testSVCUpdate(t *testing.T, initFn svcInitFn) {
 	}
 }
 
-func testSVCDel(t *testing.T, initFn svcInitFn) {
+func testSVCDel(t *testing.T, initFn SVCInitFn) {
 	type (
 		inputs struct {
 			id string
@@ -385,14 +384,14 @@ func testSVCDel(t *testing.T, initFn svcInitFn) {
 
 	tests := []struct {
 		name    string
-		options svcTestOpts
+		options SVCTestOpts
 		input   inputs
 		want    wantFn
 	}{
 		{
 			name: "with id for existing foo should pass",
-			options: svcTestOpts{
-				prepDB: createFoos(allsrv.Foo{ID: "9000", Name: "goku"}),
+			options: SVCTestOpts{
+				PrepDB: CreateFoos(allsrv.Foo{ID: "9000", Name: "goku"}),
 			},
 			input: inputs{
 				id: "9000",
@@ -433,30 +432,30 @@ func testSVCDel(t *testing.T, initFn svcInitFn) {
 			deps := initFn(t, withTestOptions(tt.options))
 
 			// action
-			err := deps.svc.DelFoo(context.TODO(), tt.input.id)
+			err := deps.SVC.DelFoo(context.TODO(), tt.input.id)
 
 			// assert
-			tt.want(t, deps.svc, err)
+			tt.want(t, deps.SVC, err)
 		})
 	}
 }
 
 // withTestOptions provides some sane default values for tests.
-func withTestOptions(opts svcTestOpts) svcTestOpts {
-	if opts.prepDB == nil {
-		opts.prepDB = func(t *testing.T, db allsrv.DB) {}
+func withTestOptions(opts SVCTestOpts) SVCTestOpts {
+	if opts.PrepDB == nil {
+		opts.PrepDB = func(t *testing.T, db allsrv.DB) {}
 	}
 	// purposefully checking nil here, empty slice indicates no options
-	if opts.svcOpts == nil {
-		opts.svcOpts = defaultSVCOpts(start)
+	if opts.SVCOpts == nil {
+		opts.SVCOpts = DefaultSVCOpts(start)
 	}
 	return opts
 }
 
-func defaultSVCOpts(start time.Time) []func(*allsrv.Service) {
+func DefaultSVCOpts(start time.Time) []func(*allsrv.Service) {
 	return []func(*allsrv.Service){
-		allsrv.WithSVCIDFn(newIDGen(1, 1)),
-		allsrv.WithSVCNowFn(nowFn(start, time.Hour)),
+		allsrv.WithSVCIDFn(IDGen(1, 1)),
+		allsrv.WithSVCNowFn(NowFn(start, time.Hour)),
 	}
 }
 
@@ -469,15 +468,13 @@ func wantFoo(want allsrv.Foo) func(t *testing.T, got allsrv.Foo, opErr error) {
 	}
 }
 
-func newTestLogger(t *testing.T) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(&testr{t: t}, nil))
-}
+func CreateFoos(foos ...allsrv.Foo) func(t *testing.T, db allsrv.DB) {
+	return func(t *testing.T, db allsrv.DB) {
+		t.Helper()
 
-type testr struct {
-	t *testing.T
-}
-
-func (t *testr) Write(p []byte) (n int, err error) {
-	t.t.Log(string(p))
-	return len(p), nil
+		for _, f := range foos {
+			err := db.CreateFoo(context.TODO(), f)
+			require.NoError(t, err)
+		}
+	}
 }

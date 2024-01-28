@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jsteenb2/mess/allsrv"
+	"github.com/jsteenb2/mess/allsrv/allsrvtesting"
 )
 
 type dbInitFn func(t *testing.T) allsrv.DB
@@ -138,7 +139,7 @@ func testDBCreateFoo(t *testing.T, initFn dbInitFn) {
 		},
 		{
 			name:    "with foo containing name that already exists should fail",
-			prepare: createFoos(allsrv.Foo{ID: "1", Name: "collision"}),
+			prepare: allsrvtesting.CreateFoos(allsrv.Foo{ID: "1", Name: "collision"}),
 			inputs: inputs{
 				foo: allsrv.Foo{
 					ID:        "2",
@@ -154,7 +155,7 @@ func testDBCreateFoo(t *testing.T, initFn dbInitFn) {
 		},
 		{
 			name:    "with foo containing ID that already exists should fail",
-			prepare: createFoos(allsrv.Foo{ID: "1", Name: "name-1"}),
+			prepare: allsrvtesting.CreateFoos(allsrv.Foo{ID: "1", Name: "name-1"}),
 			inputs: inputs{
 				foo: allsrv.Foo{
 					ID:        "1",
@@ -209,7 +210,7 @@ func testDBReadFoo(t *testing.T, initFn dbInitFn) {
 	}{
 		{
 			name: "with id for existing foo should pass",
-			prepare: createFoos(allsrv.Foo{
+			prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 				ID:        "1",
 				Name:      "name-1",
 				Note:      "note-1",
@@ -318,7 +319,7 @@ func testDBUpdateFoo(t *testing.T, initFn dbInitFn) {
 	}{
 		{
 			name: "with valid update for existing foo should pass",
-			prepare: createFoos(allsrv.Foo{
+			prepare: allsrvtesting.CreateFoos(allsrv.Foo{
 				ID:        "1",
 				Name:      "name",
 				Note:      "note",
@@ -448,7 +449,7 @@ func testDBDeleteFoo(t *testing.T, initFn dbInitFn) {
 	}{
 		{
 			name:    "with id for existing foo should pass",
-			prepare: createFoos(allsrv.Foo{ID: "1", Name: "blue"}),
+			prepare: allsrvtesting.CreateFoos(allsrv.Foo{ID: "1", Name: "blue"}),
 			inputs: inputs{
 				id: "1",
 			},

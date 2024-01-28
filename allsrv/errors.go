@@ -23,7 +23,7 @@ var errTypeStrs = [...]string{
 }
 
 var (
-	errIDRequired = InvalidErr("id is requierd")
+	errIDRequired = InvalidErr("id is required")
 )
 
 // Err provides a lightly structured error that we can attach behavior. Additionally,
