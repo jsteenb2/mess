@@ -1,0 +1,158 @@
+{{- $title := "How to Inherit a Mess" -}}
+# {{ $title }}
+
+Welcome all! This git repo outlines most everything we're going to cover in the
+workshop. There will be some quips here and there that may not be captured here,
+but by and large this will be the entirety. The below walks through the codebase
+as it was developed. For the best possible outcomes, follow each step in the
+order they are given.
+
+Make sure you have the following on your machine to get started:
+* go [1.22+](https://go.dev/dl/)
+* text editor/IDE
+* pull this [repo](https://github.com/jsteenb2/mess)
+* have this Readme open in github (very handy for navigation)
+
+Most of the Questions listed below are aimed at self study(i.e. may not have time in
+the in person workshop). Feel free to create a branch from a commit and make changes
+to your hearts content. It is not recommended you futz with the git history of the
+main branch though, as that will break all the navigation listed below.
+
+The contents of the workshop are ordered by the git repository's commit message. This
+README is generated from those commits. From this we take our first lesson of the
+workshop:
+
+> Write meaningful commits
+
+If you play your cards right, you can do a whole lot with your commit history. Use a
+commit to add any tribal knowledge that isn't clear from the code/comments. At the
+very least, leave a bread crumb in the commit that outlines how and why the decision(s)
+were made. Additionally, when you choose a specification like [conventional commits](https://www.conventionalcommits.org),
+you have some structure to tie into. This README is generated with a simple
+[template engine](https://github.com/jsteenb2/gitempl). Adding a little structure
+to the commit log made it all possible.
+
+---
+
+{{ $commits := .Commits.DropByNote "Visibility" "ignore" -}}
+## Table of Contents
+
+1. [Introduction](#1-introduction-top)
+{{ range $i, $el := $commits -}}
+{{- $label := add $i 2 -}}
+{{ $label }}. [{{ .CC.Desc | title }}](#{{ $label }}-{{ markdownHeaderLink .CC.Desc }}-top)
+{{ end -}}
+{{ len $commits | add 2 }}. [References](#references-top)
+{{ len $commits | add 3 }}. [Suggested Resources](#suggested-resources-top)
+
+---
+
+### 1. Introduction [[top]](#{{ $title | markdownHeaderLink }})
+
+This workshop walks through a very familiar situation we've all found ourselves in at
+some point in our careers. It starts something like this:
+
+> I just accepted a job with $COMPANY! I can't wait to get started!
+
+It's an exciting time. Endless possibilities await you. The days leading up to this
+new position are filled with anticipation and excitement. Then finally, the time comes
+for you to start the new role. The anticipation for this day carries you through the
+onboarding slog. You sum up your first week:
+
+> Wow! This is so exciting! So much to learn.... I'll be drinking from the firehose for a while!
+
+Fast forward six months to a year and somehow the mood has soured. What was once amazement has
+morphed into a laundry list of grievances:
+
+ 1. Lack of clear intention behind the system design/codebase
+ 2. CI process that is counted in 10min increments
+ 3. Tests.... where are they?
+ 4. gorm v1
+ 5. Found the tests.... and they're completely coupled to the implementation
+ 6. Ughhhh...
+
+We've all found ourselves in this visceral quagmire at some point in our career. We have
+options when we hit this point:
+
+1. We polish off our resume and look for the green grass elsewhere
+    * I don't blame anyone for taking this route
+2. Acclimate yourself to the mess
+    * Effectively give up hope that change is a possibility and just mosey along. Very common when golden handcuffs are in play
+3. Be an agent of change!
+
+⚠️ Disclaimer: you can assume all three options simultaneously, they are not exclusive by any means.
+
+Thi workshop is primarily aimed at the person putting on the option 3 hat. Though I will warn you
+it can be an exhausting, unforgiving, and unrewarding endeavor... When you're able to get
+buy in from your team and your management, and you're convinced the juice is worth the squeeze...
+The only thing left is to equip yourselves with the tools to get the job done.
+
+Welcome to "How to Inherit a Mess"!
+
+{{ $refIdx := 0 -}}
+{{ range $i, $el := $commits -}}
+### {{ add $i 2 }}. {{ .CC.Desc | title }} [[top]](#{{ $title | markdownHeaderLink }})
+
+* pkg: **{{ .CC.Scope }}**
+* commit: **[github](https://github.com/jsteenb2/mess/commit/{{ .Hash }})**
+
+```shell
+git checkout {{ .HashShort }}
+```
+
+<details>
+<summary>Files impacted</summary>
+
+{{ .Stats | statsHTMLTable }}
+
+</details>
+
+{{ .CC.Body }}
+
+{{ with .CC.Notes.KeepByType "Question" -}}
+#### Questions
+
+{{ range . -}}
+* [ ] {{ .Value }}
+{{ end -}}{{ end }}
+
+{{ with .CC.Notes.KeepByType "Refs" -}}
+<details><summary>References</summary>
+
+{{ range . -}}{{ $refIdx = add $refIdx 1 -}}
+{{ $refIdx }}. {{ .Value }}
+{{ end }}
+</details>
+
+{{ end -}}{{ end -}}
+### References [[top]](#{{ $title | markdownHeaderLink }})
+{{ $refIdx = 0}}
+{{ range $i, $commit := $commits -}}
+{{ range .CC.Notes.KeepByType "Refs" -}}{{ $refIdx = add $refIdx 1 -}}
+{{ $refIdx }}. {{ .Value }} [[section](#{{ add $i 2 }}-{{ markdownHeaderLink $commit.CC.Desc }}-top)]
+{{ end -}}
+{{- end }}
+
+### Suggested Resources [[top]](#{{ $title | markdownHeaderLink }})
+
+1. [TDD, Where Did It All Go Wrong - Ian Cooper](https://www.youtube.com/watch?v=EZ05e7EMOLM)
+    * Excellent talk that touches on some busted testing paradigms and how to remedy them
+2. [Absolute Unit (Test) - Dave Cheney](https://www.youtube.com/watch?v=UKe5sX1dZ0k)
+    * Builds on Ian's talk, but provides it in the context of `go` with useful examples
+3. [Intentional Code - Minimalism in a World of Dogmatic Design - David Whitney](https://www.youtube.com/watch?v=8j4fhsLcT4k)
+4. [Error Handling in Upspin - Rob Pike](https://commandcenter.blogspot.com/2017/12/error-handling-in-upspin.html)
+    * Incredibly insightful look at what you can do for errors. This was largest inspiration for the [errors](https://github.com/jsteenb2/errors) module
+5. [Generics Unconstrained! - Roger Peppe](https://www.youtube.com/watch?v=eU-w2psAvdA)
+    * The best resource for `go` generics
+6. [Systems Thinking Demystified - Dr. Russ Ackoff](https://www.youtube.com/watch?v=OqEeIG8aPPk)
+    * One of the most influential disciplines I've ever picked up, systems thinking will improve your engineering
+7. [0-60 Systems Thinking Resources](https://gist.github.com/jsteenb2#systems-thinking---go-beyond-the-jira-ticket)
+    * Ton of useful resources for picking up systems thinking `:YAAAAAS:`
+8. [Clean Up Your GOOOP: How to Break OOP Muscle Memory - Dylan Bourque](https://www.youtube.com/watch?v=qeTzjeuq3cw)
+    * Deep dive into OOP patterns that show up in `go` and how to make sense of it all
+9. [High-Assurance Go Cryptography - Filippo Valsorda](https://www.youtube.com/watch?v=lkEH3V3PkS0)
+    * Intriguing look at how the `go` crypto contributors use testing to maintain velocity, safety and endurance
+
+---
+
+generated by [github.com/jsteenb2/gitempl](https://github.com/jsteenb2/gitempl)
