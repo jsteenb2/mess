@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jsteenb2/allsrvc"
 	"github.com/jsteenb2/mess/allsrv"
 	"github.com/jsteenb2/mess/allsrv/allsrvtesting"
 )
@@ -57,12 +58,12 @@ func (c *cmdCLI) expectFoo(ctx context.Context, op string, args ...string) (alls
 		return allsrv.Foo{}, err
 	}
 
-	var out allsrv.Foo
+	var out allsrvc.Data[allsrvc.ResourceFooAttrs]
 	if err := json.Unmarshal(b, &out); err != nil {
 		return allsrv.Foo{}, err
 	}
 
-	return out, nil
+	return allsrv.DataToFoo(out), nil
 }
 
 func (c *cmdCLI) execute(ctx context.Context, op string, args ...string) ([]byte, error) {

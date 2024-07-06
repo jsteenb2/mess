@@ -1,182 +1,109 @@
 package allsrv
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"time"
-	
+
 	"github.com/jsteenb2/errors"
+
+	"github.com/jsteenb2/allsrvc"
 )
 
 type ClientHTTP struct {
-	addr string
-	c    *http.Client
+	c *allsrvc.ClientHTTP
 }
 
 var _ SVC = (*ClientHTTP)(nil)
 
-func NewClientHTTP(addr string, c *http.Client) *ClientHTTP {
+func NewClientHTTP(addr, origin string, c *http.Client, opts ...func(*allsrvc.ClientHTTP)) *ClientHTTP {
 	return &ClientHTTP{
-		addr: addr,
-		c:    c,
+		c: allsrvc.NewClientHTTP(addr, origin, c, opts...),
 	}
 }
 
 func (c *ClientHTTP) CreateFoo(ctx context.Context, f Foo) (Foo, error) {
-	req, err := jsonReq(ctx, "POST", c.fooPath(""), toReqCreateFooV1(f))
+	resp, err := c.c.CreateFoo(ctx, allsrvc.FooCreateAttrs{
+		Name: f.Name,
+		Note: f.Note,
+	})
 	if err != nil {
 		return Foo{}, InternalErr(err.Error())
 	}
-	return returnsFooReq(c.c, req)
+	newFoo, err := takeRespFoo(resp)
+	return newFoo, errors.Wrap(err)
 }
 
 func (c *ClientHTTP) ReadFoo(ctx context.Context, id string) (Foo, error) {
-	if id == "" {
-		return Foo{}, errIDRequired
+	resp, err := c.c.ReadFoo(ctx, id)
+	if err != nil {
+		if errors.Is(err, allsrvc.ErrIDRequired) {
+			return Foo{}, errIDRequired
+		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.fooPath(id), nil)
-	if err != nil {
-		return Foo{}, InternalErr(err.Error())
-	}
-	return returnsFooReq(c.c, req)
+	newFoo, err := takeRespFoo(resp)
+	return newFoo, errors.Wrap(err)
 }
 
 func (c *ClientHTTP) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
-	req, err := jsonReq(ctx, "PATCH", c.fooPath(f.ID), toReqUpdateFooV1(f))
+	resp, err := c.c.UpdateFoo(ctx, f.ID, allsrvc.FooUpdAttrs{
+		Name: f.Name,
+		Note: f.Note,
+	})
 	if err != nil {
 		return Foo{}, InternalErr(err.Error())
 	}
-	return returnsFooReq(c.c, req)
+	newFoo, err := takeRespFoo(resp)
+	return newFoo, errors.Wrap(err)
 }
 
 func (c *ClientHTTP) DelFoo(ctx context.Context, id string) error {
-	if id == "" {
-		return errIDRequired
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "DELETE", c.fooPath(id), nil)
+	resp, err := c.c.DelFoo(ctx, id)
 	if err != nil {
-		return InternalErr(err.Error())
-	}
-
-	_, err = doReq[any](c.c, req)
-	return err
-}
-
-func (c *ClientHTTP) fooPath(id string) string {
-	u := c.addr + "/v1/foos"
-	if id == "" {
-		return u
-	}
-	return u + "/" + id
-}
-
-func jsonReq(ctx context.Context, method, path string, v any) (*http.Request, error) {
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(v); err != nil {
-		return nil, InvalidErr("failed to marshal payload: " + err.Error())
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, path, &buf)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	return req, nil
-}
-
-func returnsFooReq(c *http.Client, req *http.Request) (Foo, error) {
-	data, err := doReq[ResourceFooAttrs](c, req)
-	if err != nil {
-		return Foo{}, err
-	}
-	return toFoo(data), nil
-}
-
-func doReq[Attr Attrs](c *http.Client, req *http.Request) (Data[Attr], error) {
-	resp, err := c.Do(req)
-	if err != nil {
-		return *new(Data[Attr]), InternalErr(err.Error())
-	}
-	defer func() {
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
-	}()
-
-	if resp.Header.Get("Content-Type") != "application/json" {
-		b, err := io.ReadAll(io.LimitReader(resp.Body, 500<<10))
-		if err != nil {
-			return *new(Data[Attr]), InternalErr("failed to read response body: ", err.Error())
+		if errors.Is(err, allsrvc.ErrIDRequired) {
+			return errIDRequired
 		}
-		return *new(Data[Attr]), InternalErr("invalid content type received; content=" + string(b))
-	}
-	// TODO(berg): handle unexpected status code (502|503|etc)
-
-	var respBody RespBody[Attr]
-	err = json.NewDecoder(resp.Body).Decode(&respBody)
-	if err != nil {
-		return *new(Data[Attr]), InternalErr(err.Error())
 	}
 
-	var errs []error
-	for _, respErr := range respBody.Errs {
-		errs = append(errs, toErr(respErr))
+	return errors.Wrap(convertSDKErrors(resp.Errs))
+}
+
+func DataToFoo(data allsrvc.Data[allsrvc.ResourceFooAttrs]) Foo {
+	return Foo{
+		ID:        data.ID,
+		Name:      data.Attrs.Name,
+		Note:      data.Attrs.Note,
+		CreatedAt: toTime(data.Attrs.CreatedAt),
+		UpdatedAt: toTime(data.Attrs.UpdatedAt),
 	}
-	if len(errs) == 1 {
-		return *new(Data[Attr]), errs[0]
-	}
-	if len(errs) > 1 {
-		return *new(Data[Attr]), errors.Join(errs)
+}
+
+func takeRespFoo(respBody allsrvc.RespBody[allsrvc.ResourceFooAttrs]) (Foo, error) {
+	if err := convertSDKErrors(respBody.Errs); err != nil {
+		return Foo{}, errors.Wrap(err)
 	}
 
 	if respBody.Data == nil {
-		return *new(Data[Attr]), nil
+		return Foo{}, nil
 	}
 
-	return *respBody.Data, nil
+	return DataToFoo(*respBody.Data), nil
 }
 
-func toReqCreateFooV1(f Foo) ReqCreateFooV1 {
-	return ReqCreateFooV1{
-		Data: Data[FooCreateAttrs]{
-			Type: "foo",
-			Attrs: FooCreateAttrs{
-				Name: f.Name,
-				Note: f.Note,
-			},
-		},
-	}
-}
-
-func toReqUpdateFooV1(f FooUpd) ReqUpdateFooV1 {
-	return ReqUpdateFooV1{
-		Data: Data[FooUpdAttrs]{
-			Type: "foo",
-			ID:   f.ID,
-			Attrs: FooUpdAttrs{
-				Name: f.Name,
-				Note: f.Note,
-			},
-		},
+func convertSDKErrors(errs []allsrvc.RespErr) error {
+	// TODO(@berg): update this to slices pkg when 1.23 lands
+	switch out := toSlc(errs, toErr); {
+	case len(out) == 1:
+		return out[0]
+	case len(out) > 1:
+		return errors.Join(out)
+	default:
+		return nil
 	}
 }
 
-func toFoo(d Data[ResourceFooAttrs]) Foo {
-	return Foo{
-		ID:        d.ID,
-		Name:      d.Attrs.Name,
-		Note:      d.Attrs.Note,
-		CreatedAt: toTime(d.Attrs.CreatedAt),
-		UpdatedAt: toTime(d.Attrs.UpdatedAt),
-	}
-}
-
-func toErr(respErr RespErr) error {
+func toErr(respErr allsrvc.RespErr) error {
 	errFn := InternalErr
 	switch respErr.Code {
 	case errCodeExist:
@@ -198,4 +125,12 @@ func toErr(respErr RespErr) error {
 func toTime(in string) time.Time {
 	t, _ := time.Parse(time.RFC3339, in)
 	return t
+}
+
+func toSlc[In, Out any](in []In, to func(In) Out) []Out {
+	out := make([]Out, len(in))
+	for _, v := range in {
+		out = append(out, to(v))
+	}
+	return out
 }

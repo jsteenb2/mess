@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/jsteenb2/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/jsteenb2/allsrvc"
 	"github.com/jsteenb2/mess/allsrv"
 )
 
@@ -23,8 +26,15 @@ func newCmd() *cobra.Command {
 	return c.cmd()
 }
 
+const name = "allsrvc"
+
 type cli struct {
+	// base flags
 	addr string
+	pass string
+	user string
+
+	// foo flags
 	id   string
 	name string
 	note string
@@ -32,7 +42,8 @@ type cli struct {
 
 func (c *cli) cmd() *cobra.Command {
 	cmd := cobra.Command{
-		Use: "allsrvc",
+		Use:          name,
+		SilenceUsage: true,
 	}
 
 	cmd.AddCommand(
@@ -65,7 +76,7 @@ func (c *cli) cmdCreateFoo() *cobra.Command {
 			return json.NewEncoder(cmd.OutOrStderr()).Encode(f)
 		},
 	}
-	cmd.Flags().StringVar(&c.addr, "addr", "http://localhost:8091", "addr for foo svc")
+	c.registerCommonFlags(&cmd)
 	cmd.Flags().StringVar(&c.name, "name", "", "name of the new foo")
 	cmd.Flags().StringVar(&c.note, "note", "", "optional foo note")
 
@@ -85,11 +96,10 @@ func (c *cli) cmdReadFoo() *cobra.Command {
 				return err
 			}
 
-			return json.NewEncoder(cmd.OutOrStderr()).Encode(f)
+			return errors.Wrap(writeFoo(cmd.OutOrStdout(), f))
 		},
 	}
-	cmd.Flags().StringVar(&c.addr, "addr", "http://localhost:8091", "addr for foo svc")
-
+	c.registerCommonFlags(&cmd)
 	return &cmd
 }
 
@@ -116,10 +126,10 @@ func (c *cli) cmdUpdateFoo() *cobra.Command {
 				return err
 			}
 
-			return json.NewEncoder(cmd.OutOrStderr()).Encode(f)
+			return errors.Wrap(writeFoo(cmd.OutOrStdout(), f))
 		},
 	}
-	cmd.Flags().StringVar(&c.addr, "addr", "http://localhost:8091", "addr for foo svc")
+	c.registerCommonFlags(&cmd)
 	cmd.Flags().StringVar(&c.id, "id", "", "id of the foo resource")
 	cmd.Flags().StringVar(&c.name, "name", "", "optional foo name")
 	cmd.Flags().StringVar(&c.note, "note", "", "optional foo note")
@@ -137,11 +147,26 @@ func (c *cli) cmdRmFoo() *cobra.Command {
 			return client.DelFoo(cmd.Context(), args[0])
 		},
 	}
-	cmd.Flags().StringVar(&c.addr, "addr", "http://localhost:8091", "addr for foo svc")
-
+	c.registerCommonFlags(&cmd)
 	return &cmd
 }
 
 func (c *cli) newClient() *allsrv.ClientHTTP {
-	return allsrv.NewClientHTTP(c.addr, &http.Client{Timeout: 5 * time.Second})
+	return allsrv.NewClientHTTP(
+		c.addr,
+		name,
+		&http.Client{Timeout: 5 * time.Second},
+		allsrvc.WithBasicAuth(c.user, c.pass),
+	)
+}
+
+func (c *cli) registerCommonFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&c.addr, "addr", "http://localhost:8091", "addr for foo svc")
+	cmd.Flags().StringVar(&c.user, "user", "admin", "user for basic auth")
+	cmd.Flags().StringVar(&c.pass, "password", "pass", "password for basic auth")
+}
+
+func writeFoo(w io.Writer, f allsrv.Foo) error {
+	err := json.NewEncoder(w).Encode(allsrv.FooToData(f))
+	return errors.Wrap(err)
 }
