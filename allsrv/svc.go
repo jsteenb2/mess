@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/jsteenb2/errors"
 )
 
 // Foo represents the foo domain entity.
@@ -86,14 +87,14 @@ func NewService(db DB, opts ...func(*Service)) *Service {
 
 func (s *Service) CreateFoo(ctx context.Context, f Foo) (Foo, error) {
 	if err := f.OK(); err != nil {
-		return Foo{}, err
+		return Foo{}, errors.Wrap(err)
 	}
 
 	now := s.nowFn()
 	f.ID, f.CreatedAt, f.UpdatedAt = s.idFn(), now, now
 
 	if err := s.db.CreateFoo(ctx, f); err != nil {
-		return Foo{}, err
+		return Foo{}, errors.Wrap(err)
 	}
 
 	return f, nil
@@ -103,13 +104,14 @@ func (s *Service) ReadFoo(ctx context.Context, id string) (Foo, error) {
 	if id == "" {
 		return Foo{}, errIDRequired
 	}
-	return s.db.ReadFoo(ctx, id)
+	f, err := s.db.ReadFoo(ctx, id)
+	return f, errors.Wrap(err)
 }
 
 func (s *Service) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
 	existing, err := s.db.ReadFoo(ctx, f.ID)
 	if err != nil {
-		return Foo{}, err
+		return Foo{}, errors.Wrap(err)
 	}
 	if newName := f.Name; newName != nil {
 		existing.Name = *newName
@@ -121,7 +123,7 @@ func (s *Service) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
 
 	err = s.db.UpdateFoo(ctx, existing)
 	if err != nil {
-		return Foo{}, err
+		return Foo{}, errors.Wrap(err)
 	}
 
 	return existing, nil
@@ -129,7 +131,7 @@ func (s *Service) UpdateFoo(ctx context.Context, f FooUpd) (Foo, error) {
 
 func (s *Service) DelFoo(ctx context.Context, id string) error {
 	if id == "" {
-		return errIDRequired
+		return errors.Wrap(errIDRequired)
 	}
-	return s.db.DelFoo(ctx, id)
+	return errors.Wrap(s.db.DelFoo(ctx, id))
 }

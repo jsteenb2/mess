@@ -2,11 +2,11 @@ package allsrv_test
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
-
+	
+	"github.com/jsteenb2/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -167,7 +167,7 @@ func testDBCreateFoo(t *testing.T, initFn dbInitFn) {
 			},
 			want: func(t *testing.T, db allsrv.DB, insertErr error) {
 				require.Error(t, insertErr)
-				assert.True(t, allsrv.IsExistsErr(insertErr))
+				assert.True(t, errors.Is(insertErr, allsrv.ErrKindExists))
 			},
 		},
 	}
@@ -406,7 +406,7 @@ func testDBUpdateFoo(t *testing.T, initFn dbInitFn) {
 			},
 			want: func(t *testing.T, db allsrv.DB, updateErr error) {
 				require.Error(t, updateErr)
-				assert.True(t, allsrv.IsNotFoundErr(updateErr))
+				assert.True(t, errors.Is(updateErr, allsrv.ErrKindNotFound))
 			},
 		},
 	}
@@ -497,7 +497,7 @@ func testDBDeleteFoo(t *testing.T, initFn dbInitFn) {
 			inputs: inputs{id: "1"},
 			want: func(t *testing.T, db allsrv.DB, delErr error) {
 				require.Error(t, delErr)
-				assert.True(t, allsrv.IsNotFoundErr(delErr))
+				assert.True(t, errors.Is(delErr, allsrv.ErrKindNotFound))
 			},
 		},
 	}

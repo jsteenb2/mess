@@ -8,6 +8,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/hashicorp/go-metrics v0.5.3
 	github.com/jmoiron/sqlx v1.3.5
+	github.com/jsteenb2/errors v0.2.0
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/spf13/cobra v1.8.0

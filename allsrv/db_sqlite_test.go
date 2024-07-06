@@ -17,14 +17,16 @@ import (
 )
 
 func TestSQLite(t *testing.T) {
-	testDB(t, func(t *testing.T) allsrv.DB {
-		db := newSQLiteInmem(t)
-		t.Cleanup(func() {
-			assert.NoError(t, db.Close())
-		})
+	testDB(t, newSQLiteDB)
+}
 
-		return allsrv.NewSQLiteDB(db)
+func newSQLiteDB(t *testing.T) allsrv.DB {
+	t.Helper()
+	db := newSQLiteInmem(t)
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
 	})
+	return allsrv.NewSQLiteDB(db)
 }
 
 func newSQLiteInmem(t *testing.T) *sqlx.DB {

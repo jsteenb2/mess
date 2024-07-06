@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+	
+	"github.com/jsteenb2/errors"
 )
 
 // SVCLogging wraps the service with logging concerns.
@@ -91,7 +93,7 @@ func (s *svcMWLogger) logFn(fields ...any) func(error) *slog.Logger {
 			With("took_ms", time.Since(start).Round(time.Millisecond).String())
 		if err != nil {
 			logger = logger.With("err", err.Error())
-			logger = logger.WithGroup("err_fields").With(errFields(err)...)
+			logger = logger.WithGroup("err_fields").With(errors.Fields(err)...)
 		}
 		return logger
 	}

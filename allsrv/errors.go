@@ -1,98 +1,64 @@
 package allsrv
 
 import (
-	"errors"
+	"github.com/jsteenb2/errors"
 )
 
 const (
-	errTypeUnknown = iota
-	errTypeExists
-	errTypeInvalid
-	errTypeNotFound
-	errTypeUnAuthed
-	errTypeInternal
+	ErrKindExists   = errors.Kind("exists")
+	ErrKindInvalid  = errors.Kind("invalid")
+	ErrKindNotFound = errors.Kind("not found")
+	ErrKindUnAuthed = errors.Kind("unauthorized")
+	ErrKindInternal = errors.Kind("internal")
 )
 
-var errTypeStrs = [...]string{
-	errTypeUnknown:  "unknown",
-	errTypeExists:   "exists",
-	errTypeInvalid:  "invalid",
-	errTypeUnAuthed: "unauthed",
-	errTypeNotFound: "not found",
-	errTypeInternal: "internal",
+const (
+	errCodeExist    = 1
+	errCodeInvalid  = 2
+	errCodeNotFound = 3
+	errCodeUnAuthed = 4
+	errCodeInternal = 5
+)
+
+func errCode(kind error) int {
+	switch {
+	case errors.Is(kind, ErrKindExists):
+		return errCodeExist
+	case errors.Is(kind, ErrKindInvalid):
+		return errCodeInvalid
+	case errors.Is(kind, ErrKindNotFound):
+		return errCodeNotFound
+	case errors.Is(kind, ErrKindUnAuthed):
+		return errCodeUnAuthed
+	case errors.Is(kind, ErrKindInternal):
+		return errCodeInternal
+	default:
+		return errCode(ErrKindInternal)
+	}
 }
 
 var (
 	errIDRequired = InvalidErr("id is required")
 )
 
-// Err provides a lightly structured error that we can attach behavior. Additionally,
-// the use of options makes it possible for us to enrich our logging infra without
-// blowing up the message cardinality.
-type Err struct {
-	Type   int
-	Msg    string
-	Fields []any
-}
-
-// Error returns the error message.
-func (e Err) Error() string {
-	return e.Msg
-}
-
 // ExistsErr creates an exists error.
 func ExistsErr(msg string, fields ...any) error {
-	return Err{
-		Type:   errTypeExists,
-		Msg:    msg,
-		Fields: fields,
-	}
+	return errors.New(msg, errors.KVs(fields...), ErrKindExists, errors.SkipCaller)
 }
 
 func InvalidErr(msg string, fields ...any) error {
-	return Err{
-		Type:   errTypeInvalid,
-		Msg:    msg,
-		Fields: fields,
-	}
+	return errors.New(msg, errors.KVs(fields...), ErrKindInvalid, errors.SkipCaller)
 }
 
 func InternalErr(msg string, fields ...any) error {
-	return Err{
-		Type:   errTypeInternal,
-		Msg:    msg,
-		Fields: fields,
-	}
+	return errors.New(msg, errors.KVs(fields...), ErrKindInternal, errors.SkipCaller)
 }
 
 // NotFoundErr creates a not found error.
 func NotFoundErr(msg string, fields ...any) error {
-	return Err{
-		Type:   errTypeNotFound,
-		Msg:    msg,
-		Fields: fields,
-	}
+	return errors.New(msg, errors.KVs(fields...), ErrKindNotFound, errors.SkipCaller)
 }
 
-func errFields(err error) []any {
-	var aErr Err
-	errors.As(err, &aErr)
-	return append(aErr.Fields, "err_type", errTypeStrs[aErr.Type])
-}
-
-func IsExistsErr(err error) bool {
-	return isErrType(err, errTypeExists)
-}
-
-func IsInvalidErr(err error) bool {
-	return isErrType(err, errTypeInvalid)
-}
-
-func IsNotFoundErr(err error) bool {
-	return isErrType(err, errTypeNotFound)
-}
-
-func isErrType(err error, want int) bool {
-	var aErr Err
-	return errors.As(err, &aErr) && aErr.Type == want
+func unauthedErr(msg string, fields ...any) error {
+	return errors.New(msg, errors.KVs(fields...), ErrKindUnAuthed, errors.SkipCaller)
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jsteenb2/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -107,7 +108,7 @@ func testSVCCreate(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, _ allsrv.Foo, insertErr error) {
 				require.Error(t, insertErr)
-				assert.True(t, allsrv.IsExistsErr(insertErr))
+				assert.True(t, errors.Is(insertErr, allsrv.ErrKindExists), errors.Fields(insertErr))
 			},
 		},
 		{
@@ -120,7 +121,7 @@ func testSVCCreate(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, _ allsrv.Foo, insertErr error) {
 				require.Error(t, insertErr)
-				assert.True(t, allsrv.IsInvalidErr(insertErr))
+				assert.True(t, errors.Is(insertErr, allsrv.ErrKindInvalid))
 			},
 		},
 	}
@@ -202,7 +203,7 @@ func testSVCRead(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, got allsrv.Foo, readErr error) {
 				require.Error(t, readErr)
-				assert.True(t, allsrv.IsInvalidErr(readErr), "got_err="+readErr.Error())
+				assert.True(t, errors.Is(readErr, allsrv.ErrKindInvalid), "got_err="+readErr.Error())
 			},
 		},
 		{
@@ -212,7 +213,7 @@ func testSVCRead(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, got allsrv.Foo, readErr error) {
 				require.Error(t, readErr)
-				assert.True(t, allsrv.IsNotFoundErr(readErr))
+				assert.True(t, errors.Is(readErr, allsrv.ErrKindNotFound))
 			},
 		},
 	}
@@ -338,7 +339,7 @@ func testSVCUpdate(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
 				require.Error(t, updErr)
-				assert.True(t, allsrv.IsNotFoundErr(updErr))
+				assert.True(t, errors.Is(updErr, allsrv.ErrKindNotFound))
 			},
 		},
 		{
@@ -355,7 +356,7 @@ func testSVCUpdate(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, updatedFoo allsrv.Foo, updErr error) {
 				require.Error(t, updErr)
-				assert.True(t, allsrv.IsExistsErr(updErr))
+				assert.True(t, errors.Is(updErr, allsrv.ErrKindExists))
 			},
 		},
 	}
@@ -401,7 +402,7 @@ func testSVCDel(t *testing.T, initFn SVCInitFn) {
 
 				_, err := svc.ReadFoo(context.TODO(), "9000")
 				require.Error(t, err)
-				assert.True(t, allsrv.IsNotFoundErr(err))
+				assert.True(t, errors.Is(err, allsrv.ErrKindNotFound), errors.Fields(err))
 			},
 		},
 		{
@@ -411,7 +412,7 @@ func testSVCDel(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, svc allsrv.SVC, delErr error) {
 				require.Error(t, delErr)
-				assert.True(t, allsrv.IsNotFoundErr(delErr))
+				assert.True(t, errors.Is(delErr, allsrv.ErrKindNotFound))
 			},
 		},
 		{
@@ -421,7 +422,7 @@ func testSVCDel(t *testing.T, initFn SVCInitFn) {
 			},
 			want: func(t *testing.T, svc allsrv.SVC, delErr error) {
 				require.Error(t, delErr)
-				assert.True(t, allsrv.IsInvalidErr(delErr), "got_err="+delErr.Error())
+				assert.True(t, errors.Is(delErr, allsrv.ErrKindInvalid), "got_err="+delErr.Error())
 			},
 		},
 	}

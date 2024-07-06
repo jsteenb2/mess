@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"time"
+	
+	"github.com/jsteenb2/errors"
 )
 
 type ClientHTTP struct {
@@ -130,7 +131,7 @@ func doReq[Attr Attrs](c *http.Client, req *http.Request) (Data[Attr], error) {
 		return *new(Data[Attr]), errs[0]
 	}
 	if len(errs) > 1 {
-		return *new(Data[Attr]), errors.Join(errs...)
+		return *new(Data[Attr]), errors.Join(errs)
 	}
 
 	if respBody.Data == nil {
@@ -176,14 +177,22 @@ func toFoo(d Data[ResourceFooAttrs]) Foo {
 }
 
 func toErr(respErr RespErr) error {
-	out := Err{
-		Type: respErr.Code,
-		Msg:  respErr.Msg,
+	errFn := InternalErr
+	switch respErr.Code {
+	case errCodeExist:
+		errFn = ExistsErr
+	case errCodeInvalid:
+		errFn = InvalidErr
+	case errCodeNotFound:
+		errFn = NotFoundErr
+	case errCodeUnAuthed:
+		errFn = unauthedErr
 	}
+	var fields []any
 	if respErr.Source != nil {
-		out.Fields = append(out.Fields, "err_source", *respErr.Source)
+		fields = append(fields, "err_source", *respErr.Source)
 	}
-	return out
+	return errFn(respErr.Msg, fields...)
 }
 
 func toTime(in string) time.Time {

@@ -10,9 +10,11 @@ import (
 )
 
 func NewInmemSVC(t *testing.T, opts SVCTestOpts) allsrv.SVC {
-	db := new(allsrv.InmemDB)
-	opts.PrepDB(t, db)
+	return NewSVC(t, new(allsrv.InmemDB), opts)
+}
 
+func NewSVC(t *testing.T, db allsrv.DB, opts SVCTestOpts) allsrv.SVC {
+	opts.PrepDB(t, db)
 	var svc allsrv.SVC = allsrv.NewService(db, opts.SVCOpts...)
 	svc = allsrv.SVCLogging(newTestLogger(t))(svc)
 	svc = allsrv.ObserveSVC(metrics.Default())(svc)

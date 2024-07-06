@@ -3,12 +3,12 @@ package allsrv
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-metrics"
+	"github.com/jsteenb2/errors"
 )
 
 type SvrOptFn func(o *serverOpts)
@@ -171,7 +171,7 @@ func (s *ServerV2) createFooV1(ctx context.Context, req ReqCreateFooV1) (*Data[R
 	})
 	if err != nil {
 		respErr := toRespErr(err)
-		if isErrType(err, errTypeExists) {
+		if errors.Is(err, ErrKindExists) {
 			respErr.Source = &RespErrSource{Pointer: "/data/attributes/name"}
 		}
 		return nil, []RespErr{respErr}
@@ -208,7 +208,7 @@ func (s *ServerV2) updateFooV1(ctx context.Context, req ReqUpdateFooV1) (*Data[R
 	})
 	if err != nil {
 		respErr := toRespErr(err)
-		if isErrType(err, errTypeExists) {
+		if errors.Is(err, ErrKindExists) {
 			respErr.Source = &RespErrSource{Pointer: "/data/attributes/name"}
 		}
 		return nil, []RespErr{respErr}
@@ -256,7 +256,7 @@ func jsonIn[ReqAttr, RespAttr Attrs](resource string, successCode int, fn func(c
 		if reqBody.Data.Type != resource {
 			return nil, []RespErr{{
 				Status: http.StatusUnprocessableEntity,
-				Code:   errTypeInvalid,
+				Code:   errCode(ErrKindInvalid),
 				Msg:    "type must be " + resource,
 				Source: &RespErrSource{
 					Pointer: "/data/type",
@@ -306,7 +306,7 @@ func decodeReq[Attr Attrs](r *http.Request, v *ReqBody[Attr]) *RespErr {
 			Source: &RespErrSource{
 				Pointer: "/data",
 			},
-			Code: errTypeInvalid,
+			Code: errCode(ErrKindInvalid),
 		}
 		if unmarshErr := new(json.UnmarshalTypeError); errors.As(err, &unmarshErr) {
 			respErr.Source.Pointer += "/data"
@@ -320,7 +320,7 @@ func decodeReq[Attr Attrs](r *http.Request, v *ReqBody[Attr]) *RespErr {
 			Source: &RespErrSource{
 				Pointer: "/data/id",
 			},
-			Code: errTypeInvalid,
+			Code: errCode(ErrKindInvalid),
 		}
 	}
 
@@ -328,23 +328,23 @@ func decodeReq[Attr Attrs](r *http.Request, v *ReqBody[Attr]) *RespErr {
 }
 
 func toRespErr(err error) RespErr {
-	out := RespErr{
-		Status: http.StatusInternalServerError,
-		Code:   errTypeInternal,
+	return RespErr{
+		Status: errStatus(err),
+		Code:   errCode(err),
 		Msg:    err.Error(),
 	}
-	if e := new(Err); errors.As(err, e) {
-		out.Status, out.Code = errStatus(e), e.Type
-	}
-	return out
 }
 
-func errStatus(err *Err) int {
-	switch err.Type {
-	case errTypeExists:
+func errStatus(err error) int {
+	switch {
+	case errors.Is(err, ErrKindExists):
 		return http.StatusConflict
-	case errTypeNotFound:
+	case errors.Is(err, ErrKindInvalid):
+		return http.StatusBadRequest
+	case errors.Is(err, ErrKindNotFound):
 		return http.StatusNotFound
+	case errors.Is(err, ErrKindUnAuthed):
+		return http.StatusUnauthorized
 	default:
 		return http.StatusInternalServerError
 	}
@@ -362,7 +362,7 @@ func WithBasicAuthV2(adminUser, adminPass string) func(*serverOpts) {
 						Meta: getMeta(r.Context()),
 						Errs: []RespErr{{
 							Status: http.StatusUnauthorized,
-							Code:   errTypeUnAuthed,
+							Code:   errCode(ErrKindUnAuthed),
 							Msg:    "unauthorized access",
 							Source: &RespErrSource{
 								Header: "Authorization",

@@ -11,3 +11,10 @@ func TestService(t *testing.T) {
 		return allsrvtesting.SVCDeps{SVC: allsrvtesting.NewInmemSVC(t, opts)}
 	})
 }
+
+func TestServiceSqlite(t *testing.T) {
+	allsrvtesting.TestSVC(t, func(t *testing.T, opts allsrvtesting.SVCTestOpts) allsrvtesting.SVCDeps {
+		db := newSQLiteDB(t)
+		return allsrvtesting.SVCDeps{SVC: allsrvtesting.NewSVC(t, db, opts)}
+	})
+}

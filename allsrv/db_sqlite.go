@@ -3,12 +3,12 @@ package allsrv
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"sync"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
+	"github.com/jsteenb2/errors"
 	"github.com/mattn/go-sqlite3"
 )
 
@@ -34,7 +34,7 @@ func (s *sqlDB) CreateFoo(ctx context.Context, f Foo) error {
 		Values(f.ID, f.Name, f.Note, f.CreatedAt, f.UpdatedAt)
 
 	_, err := s.exec(ctx, sb)
-	return err
+	return errors.Wrap(err)
 }
 
 func (s *sqlDB) ReadFoo(ctx context.Context, id string) (Foo, error) {
@@ -49,7 +49,7 @@ func (s *sqlDB) ReadFoo(ctx context.Context, id string) (Foo, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Foo{}, NotFoundErr("foo not found for id: " + id)
 		}
-		return Foo{}, err
+		return Foo{}, errors.Wrap(err, errSQLiteFields(err))
 	}
 
 	out := Foo{
@@ -70,19 +70,19 @@ func (s *sqlDB) UpdateFoo(ctx context.Context, f Foo) error {
 		Set("note", f.Note).
 		Set("updated_at", f.UpdatedAt).
 		Where(sq.Eq{"id": f.ID})
-
-	return s.update(ctx, sb)
+	
+	return errors.Wrap(s.update(ctx, sb))
 }
 
 func (s *sqlDB) DelFoo(ctx context.Context, id string) error {
 	err := s.update(ctx, s.sq.Delete("foos").Where(sq.Eq{"id": id}))
-	return err
+	return errors.Wrap(err)
 }
 
 func (s *sqlDB) exec(ctx context.Context, sqlizer sq.Sqlizer) (sql.Result, error) {
 	query, args, err := sqlizer.ToSql()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err)
 	}
 
 	s.mu.Lock()
@@ -92,16 +92,16 @@ func (s *sqlDB) exec(ctx context.Context, sqlizer sq.Sqlizer) (sql.Result, error
 	if sqErr := new(sqlite3.Error); errors.As(err, sqErr) {
 		switch sqErr.Code {
 		case sqlite3.ErrConstraint:
-			return nil, ExistsErr("foo exists")
+			return nil, ExistsErr("foo exists", errSQLiteFields(err))
 		}
 	}
-	return res, err
+	return res, errors.Wrap(err, errSQLiteFields(err))
 }
 
 func (s *sqlDB) update(ctx context.Context, sqlizer sq.Sqlizer) error {
 	res, err := s.exec(ctx, sqlizer)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errSQLiteFields(err))
 	}
 
 	n, err := res.RowsAffected()
@@ -118,4 +118,15 @@ type entFoo struct {
 	Note      string    `db:"note"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+}
+
+func errSQLiteFields(err error) []errors.KV {
+	if sqErr := new(sqlite3.Error); errors.As(err, sqErr) {
+		return errors.KVs(
+			"sqlite_err_code", sqErr.Code,
+			"sqlite_err_extended_code", sqErr.ExtendedCode,
+			"sqlite_system_errno", sqErr.SystemErrno,
+		)
+	}
+	return nil
 }
